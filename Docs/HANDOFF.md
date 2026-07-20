@@ -9,7 +9,7 @@
 - `Docs/DESIGN_SPEC.md` — full design spec (rules, Oma character, screens, art direction).
 - `Docs/TECH_PLAN.md` — full tech plan (architecture, domain model, dice/camera approach, AI, testing, milestones M1–M6, risks).
 - `CLAUDE.md` — condensed project context auto-loaded each session.
-- No git repo yet — consider `git init` + Unity `.gitignore` before M1.
+- Git repo initialized with Unity `.gitignore`; remote: https://github.com/munruh250/yahtz (branch `main`).
 
 ## Decisions log (with rationale)
 
@@ -35,7 +35,7 @@
 
 ## Next steps (M1, in order)
 
-1. `git init` + Unity `.gitignore`; delete `Assets/TutorialInfo`, rename `SampleScene` → `Game`.
+1. Delete `Assets/TutorialInfo`, rename `SampleScene` → `Game` (git already set up).
 2. Create asmdefs: `Yahtzee.Core`, `Yahtzee.Presentation`, `Yahtzee.Tests.EditMode`.
 3. Implement Core: `Category`, `DiceState`, `IRandomSource`, `ScoreCalculator` (histogram + straight bitmask), `Scorecard`, `JokerRules`, `GameState`, `GameEngine` + `GameEvent`s.
 4. SaveService (headless JSON round-trip; decide JsonUtility vs. Newtonsoft here).
