@@ -52,10 +52,16 @@ namespace Yahtzee.Presentation
             refs.Dice = BuildDiceRow(safe, controller);
             refs.Scorecard = BuildScorecard(safe, controller);
             BuildActionBar(safe, controller, out var rollButton, out var rollLabel);
+
+            // Sibling order = raycast/draw order: skip overlay above the play surface,
+            // peek toggle above the overlay, game-over scrim above everything.
+            var skipOverlay = BuildSkipOverlay(safe, controller);
+            BuildPeekButton(safe, controller, out var peekButton, out var peekLabel);
             BuildGameOver(safe, controller, out var gameOverPanel, out var gameOverText);
 
             refs.Hud = safe.gameObject.AddComponent<HudView>();
-            refs.Hud.Init(rollButton, rollLabel, status, header, gameOverPanel, gameOverText);
+            refs.Hud.Init(rollButton, rollLabel, status, header, gameOverPanel, gameOverText,
+                skipOverlay, peekButton, peekLabel);
             return refs;
         }
 
@@ -63,8 +69,8 @@ namespace Yahtzee.Presentation
 
         private static void BuildHeaderAndStatus(RectTransform parent, out TextMeshProUGUI header, out TextMeshProUGUI status)
         {
-            header = Text(parent, "Header", "", 44f, UiPalette.Cream, TextAlignmentOptions.Center,
-                new Vector2(0.02f, 0.945f), new Vector2(0.98f, 0.995f));
+            header = Text(parent, "Header", "", 44f, UiPalette.Cream, TextAlignmentOptions.MidlineLeft,
+                new Vector2(0.02f, 0.945f), new Vector2(0.74f, 0.995f));
             header.fontStyle = FontStyles.Bold;
             status = Text(parent, "Status", "", 38f, UiPalette.Gold, TextAlignmentOptions.Center,
                 new Vector2(0.02f, 0.90f), new Vector2(0.98f, 0.945f));
@@ -105,8 +111,11 @@ namespace Yahtzee.Presentation
 
         private static ScorecardView BuildScorecard(RectTransform parent, GameController controller)
         {
-            var panel = Image(parent, "Scorecard", new Vector2(0.02f, 0.115f), new Vector2(0.98f, 0.77f), UiPalette.Panel).rectTransform;
-            var view = panel.gameObject.AddComponent<ScorecardView>();
+            var outer = Image(parent, "Scorecard", new Vector2(0.02f, 0.115f), new Vector2(0.98f, 0.77f), UiPalette.Panel).rectTransform;
+            var view = outer.gameObject.AddComponent<ScorecardView>();
+            var title = Text(outer, "Owner", "YOUR CARD", 28f, UiPalette.CreamDim, TextAlignmentOptions.Center,
+                new Vector2(0f, 0.945f), new Vector2(1f, 1f));
+            var panel = Rect(outer, "Grid", Vector2.zero, new Vector2(1f, 0.945f));
             var cells = new Dictionary<Category, ScoreCellView>();
 
             // Left column: upper section + bonus progress row. Right column: lower section.
@@ -131,8 +140,29 @@ namespace Yahtzee.Presentation
             var fill = Image(bonusRow, "Fill", Vector2.zero, new Vector2(0f, 1f), UiPalette.GoldDark);
             var bonusLabel = Text(bonusRow, "Label", "", 30f, UiPalette.Ink, TextAlignmentOptions.Center, Vector2.zero, Vector2.one);
 
-            view.Init(cells, bonusLabel, fill);
+            view.Init(cells, bonusLabel, fill, title);
             return view;
+        }
+
+        private static GameObject BuildSkipOverlay(RectTransform parent, GameController controller)
+        {
+            var overlay = Image(parent, "SkipOverlay", Vector2.zero, Vector2.one, Color.clear);
+            var button = overlay.gameObject.AddComponent<Button>();
+            button.targetGraphic = overlay;
+            button.transition = Selectable.Transition.None;
+            button.onClick.AddListener(controller.OnSkipTapped);
+            return overlay.gameObject;
+        }
+
+        private static void BuildPeekButton(RectTransform parent, GameController controller, out GameObject button, out TextMeshProUGUI label)
+        {
+            var bg = Image(parent, "PeekButton", new Vector2(0.76f, 0.948f), new Vector2(0.98f, 0.992f), UiPalette.Panel);
+            var peek = bg.gameObject.AddComponent<Button>();
+            peek.targetGraphic = bg;
+            peek.onClick.AddListener(controller.OnPeekTapped);
+            label = Text(bg.rectTransform, "Label", "Peek: Oma", 30f, UiPalette.Cream, TextAlignmentOptions.Center,
+                Vector2.zero, Vector2.one);
+            button = bg.gameObject;
         }
 
         private static ScoreCellView BuildCell(RectTransform parent, Category category, GameController controller, Vector2 aMin, Vector2 aMax)

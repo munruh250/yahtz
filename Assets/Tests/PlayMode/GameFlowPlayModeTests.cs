@@ -10,9 +10,9 @@ using Yahtzee.Services;
 
 namespace Yahtzee.Tests
 {
-    /// <summary>M2 exit checks, driven through GameController's public input surface (the
-    /// same methods the UI buttons call) with animations disabled. Verifies the full loop is
-    /// playable and save/continue works across a scene reload.</summary>
+    /// <summary>M2/M3 exit checks through GameController's public input surface (the same
+    /// methods the UI wires up). M3: Oma plays her own turns automatically; the driver only
+    /// plays the human side and waits for her.</summary>
     public class GameFlowPlayModeTests
     {
         [SetUp]
@@ -45,13 +45,24 @@ namespace Yahtzee.Tests
             return controller;
         }
 
-        private static void PlayOneTurn(GameController controller)
+        private static void PlayPlayerTurn(GameController controller)
         {
+            Assert.AreEqual(PlayerId.Player, controller.Engine.State.CurrentPlayer);
             controller.OnRollTapped();
             Assert.IsFalse(controller.InputLocked, "animations disabled — input should unlock synchronously");
             var best = BestCategory(controller.Engine.GetPotentialScores());
             controller.OnCellTapped(best); // select
-            controller.OnCellTapped(best); // confirm
+            controller.OnCellTapped(best); // confirm → Oma's turn starts automatically
+        }
+
+        private static IEnumerator WaitForOma(GameController controller, int maxFrames = 900)
+        {
+            int frames = 0;
+            while (controller.IsOmaTurn)
+            {
+                Assert.Less(++frames, maxFrames, "Oma's turn did not finish in time");
+                yield return null;
+            }
         }
 
         private static Category BestCategory(IReadOnlyDictionary<Category, int> potentials)
@@ -67,26 +78,85 @@ namespace Yahtzee.Tests
             return best;
         }
 
+        private static int FilledCount(Scorecard card)
+        {
+            int filled = 0;
+            for (int i = 0; i < CategoryExtensions.Count; i++)
+                if (!card.IsOpen((Category)i))
+                    filled++;
+            return filled;
+        }
+
+        // ---- Full loop -------------------------------------------------------
+
         [UnityTest]
-        public IEnumerator FullGame_PlayableThroughController()
+        public IEnumerator FullGame_PlayerVsAutoOma()
         {
             yield return LoadGameScene();
             var controller = Controller();
 
-            int guard = 0;
+            int playerTurns = 0;
             while (controller.Engine.State.Phase != GamePhase.GameOver)
             {
-                PlayOneTurn(controller);
-                Assert.Less(++guard, 27, "game did not finish in 26 turns");
-                if (guard % 6 == 0)
-                    yield return null;
+                PlayPlayerTurn(controller);
+                playerTurns++;
+                yield return WaitForOma(controller);
+                Assert.Less(playerTurns, 14, "game did not finish in 13 rounds");
             }
 
+            Assert.AreEqual(13, playerTurns);
             Assert.IsTrue(controller.Engine.State.PlayerCard.IsComplete);
-            Assert.IsTrue(controller.Engine.State.OmaCard.IsComplete);
-            // The finished game was saved but must not offer Continue.
+            Assert.IsTrue(controller.Engine.State.OmaCard.IsComplete, "Oma must have finished her card");
             Assert.IsFalse(SaveService.HasResumableSave());
         }
+
+        [UnityTest]
+        public IEnumerator OmaTurn_RunsAutomatically_FillsExactlyOneBox()
+        {
+            yield return LoadGameScene();
+            var controller = Controller();
+            int before = FilledCount(controller.Engine.State.OmaCard);
+
+            PlayPlayerTurn(controller);
+            yield return WaitForOma(controller);
+
+            Assert.AreEqual(before + 1, FilledCount(controller.Engine.State.OmaCard));
+            Assert.AreEqual(PlayerId.Player, controller.Engine.State.CurrentPlayer);
+            Assert.AreEqual(2, controller.Engine.State.Round);
+        }
+
+        [UnityTest]
+        public IEnumerator Skip_FastForwardsOmasPacedTurn()
+        {
+            yield return LoadGameScene();
+            var controller = Controller();
+
+            // Real pacing on (a full Oma turn takes 6-12 s unskipped)...
+            GameController.AnimationsEnabled = true;
+            controller.OnRollTapped();
+            int settleFrames = 0;
+            while (controller.InputLocked)
+            {
+                Assert.Less(++settleFrames, 300, "player roll animation never settled");
+                yield return null;
+            }
+            var best = BestCategory(controller.Engine.GetPotentialScores());
+            controller.OnCellTapped(best);
+            controller.OnCellTapped(best);
+            Assert.IsTrue(controller.IsOmaTurn);
+
+            // ...but spamming Skip must finish her turn in well under a second.
+            int frames = 0;
+            while (controller.IsOmaTurn)
+            {
+                controller.OnSkipTapped();
+                Assert.Less(++frames, 120, "skip did not fast-forward Oma's turn");
+                yield return null;
+            }
+            Assert.AreEqual(1, FilledCount(controller.Engine.State.OmaCard));
+        }
+
+        // ---- Save / continue -------------------------------------------------
 
         [UnityTest]
         public IEnumerator SaveAndReload_ContinuesSameGame()
@@ -94,8 +164,11 @@ namespace Yahtzee.Tests
             yield return LoadGameScene();
             var controller = Controller();
 
-            for (int i = 0; i < 5; i++)
-                PlayOneTurn(controller); // saves on every TurnChanged
+            for (int i = 0; i < 4; i++)
+            {
+                PlayPlayerTurn(controller);
+                yield return WaitForOma(controller);
+            }
 
             Assert.IsTrue(SaveService.HasResumableSave());
             string savedJson = SaveService.ToJson(SaveService.TryLoad());
@@ -105,19 +178,17 @@ namespace Yahtzee.Tests
 
             Assert.AreEqual(savedJson, SaveService.ToJson(resumed.Engine.State),
                 "reloaded scene did not resume the saved game state");
-            Assert.AreEqual(3, resumed.Engine.State.Round);
-            Assert.AreEqual(PlayerId.Oma, resumed.Engine.State.CurrentPlayer);
+            Assert.AreEqual(5, resumed.Engine.State.Round);
+            Assert.AreEqual(PlayerId.Player, resumed.Engine.State.CurrentPlayer);
 
-            // And the resumed game must still be playable to completion.
-            int guard = 0;
             while (resumed.Engine.State.Phase != GamePhase.GameOver)
             {
-                PlayOneTurn(resumed);
-                Assert.Less(++guard, 27);
-                if (guard % 6 == 0)
-                    yield return null;
+                PlayPlayerTurn(resumed);
+                yield return WaitForOma(resumed);
             }
         }
+
+        // ---- Input legality ----------------------------------------------------
 
         [UnityTest]
         public IEnumerator IllegalTaps_AreIgnoredNotThrown()
@@ -128,6 +199,7 @@ namespace Yahtzee.Tests
             // Before any roll: die taps and cell taps must be no-ops.
             controller.OnDieTapped(0);
             controller.OnCellTapped(Category.Chance);
+            controller.OnSkipTapped(); // not Oma's turn: no-op
             Assert.AreEqual(GamePhase.TurnStart, controller.Engine.State.Phase);
 
             controller.OnRollTapped();
@@ -138,6 +210,14 @@ namespace Yahtzee.Tests
             controller.OnDieTapped(0); // keeps are moot after roll 3: ignored
             Assert.AreEqual(0, controller.Engine.RollsRemaining);
 
+            // Peeking at Oma's card disables scoring taps entirely.
+            controller.OnPeekTapped();
+            controller.OnCellTapped(Category.Chance);
+            controller.OnCellTapped(Category.Chance);
+            Assert.AreEqual(GamePhase.Deciding, controller.Engine.State.Phase);
+            Assert.IsTrue(controller.Engine.State.PlayerCard.IsOpen(Category.Chance));
+            controller.OnPeekTapped(); // back to own card
+
             // Selecting one cell then confirming a different one must not score the first.
             controller.OnCellTapped(Category.Chance);
             controller.OnCellTapped(Category.Aces);   // switches selection
@@ -145,7 +225,8 @@ namespace Yahtzee.Tests
             controller.OnCellTapped(Category.Aces);   // confirm
             Assert.IsFalse(controller.Engine.State.PlayerCard.IsOpen(Category.Aces));
             Assert.IsTrue(controller.Engine.State.PlayerCard.IsOpen(Category.Chance));
-            yield return null;
+
+            yield return WaitForOma(controller);
         }
     }
 }

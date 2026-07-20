@@ -13,13 +13,18 @@ namespace Yahtzee.Presentation
         private Dictionary<Category, ScoreCellView> _cells;
         private TextMeshProUGUI _bonusLabel;
         private Image _bonusFill;
+        private TextMeshProUGUI _title;
 
-        public void Init(Dictionary<Category, ScoreCellView> cells, TextMeshProUGUI bonusLabel, Image bonusFill)
+        public void Init(Dictionary<Category, ScoreCellView> cells, TextMeshProUGUI bonusLabel, Image bonusFill, TextMeshProUGUI title)
         {
             _cells = cells;
             _bonusLabel = bonusLabel;
             _bonusFill = bonusFill;
+            _title = title;
         }
+
+        /// <summary>Whose card is on screen ("YOUR CARD" / "OMA'S CARD") — matters for peeking.</summary>
+        public void SetOwner(string label) => _title.text = label;
 
         /// <summary>Redraw every cell from the card + current potentials. <paramref name="potentials"/>
         /// is null outside the deciding phase (no ghosts, nothing selectable);

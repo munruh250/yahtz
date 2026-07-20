@@ -17,5 +17,9 @@ namespace Yahtzee.Presentation
 
         /// <summary>Whether dice respond to taps (keep/release).</summary>
         void SetInteractable(bool interactable);
+
+        /// <summary>Finish any in-flight roll animation immediately (used by Skip). Shows the
+        /// final values and fires the pending onSettled callback; no-op when idle.</summary>
+        void SkipAnimation();
     }
 }

@@ -14,6 +14,9 @@ namespace Yahtzee.Presentation
 
         private DieView2D[] _dice;
         private Coroutine _rollRoutine;
+        private int[] _pendingValues;
+        private bool[] _pendingKept;
+        private Action _pendingSettled;
 
         public void Init(DieView2D[] dice)
         {
@@ -31,15 +34,17 @@ namespace Yahtzee.Presentation
 
         public void PlayRoll(int[] values, bool[] kept, Action onSettled)
         {
-            if (_rollRoutine != null)
-                StopCoroutine(_rollRoutine);
+            SkipAnimation(); // never two rolls in flight
             if (!GameController.AnimationsEnabled)
             {
                 SetDice(values, kept);
                 onSettled();
                 return;
             }
-            _rollRoutine = StartCoroutine(RollRoutine(values, kept, onSettled));
+            _pendingValues = values;
+            _pendingKept = kept;
+            _pendingSettled = onSettled;
+            _rollRoutine = StartCoroutine(RollRoutine(values, kept));
         }
 
         public void SetInteractable(bool interactable)
@@ -48,7 +53,26 @@ namespace Yahtzee.Presentation
                 die.SetInteractable(interactable);
         }
 
-        private IEnumerator RollRoutine(int[] values, bool[] kept, Action onSettled)
+        public void SkipAnimation()
+        {
+            if (_rollRoutine == null)
+                return;
+            StopCoroutine(_rollRoutine);
+            _rollRoutine = null;
+            Settle();
+        }
+
+        private void Settle()
+        {
+            SetDice(_pendingValues, _pendingKept);
+            var settled = _pendingSettled;
+            _pendingValues = null;
+            _pendingKept = null;
+            _pendingSettled = null;
+            settled?.Invoke();
+        }
+
+        private IEnumerator RollRoutine(int[] values, bool[] kept)
         {
             float elapsed = 0f;
             while (elapsed < RollDuration)
@@ -59,9 +83,8 @@ namespace Yahtzee.Presentation
                 yield return new WaitForSeconds(FaceFlickerInterval);
                 elapsed += FaceFlickerInterval;
             }
-            SetDice(values, kept);
             _rollRoutine = null;
-            onSettled();
+            Settle();
         }
     }
 }

@@ -1,7 +1,7 @@
 # Handoff — Yahtzee with Oma
 
-**Last updated:** 2026-07-20
-**Status:** **M2 complete — playable 2D prototype loop, owner-verified in editor.** Next step: **M3 — Oma plays (AI + turn pacing + skip + simulation tuning).**
+**Last updated:** 2026-07-20 (overnight session)
+**Status:** **M3 complete — Oma plays her own turns.** EditMode 94 + PlayMode 5 all green; 10k-game sim: mean 219.0 (target 200-230), zero illegal actions. Next step: **M4 — the kitchen (3D scene, physics dice, camera rig).**
 
 ## What exists
 
@@ -47,15 +47,21 @@ The primary `C:\Program Files\Unity\Hub\Editor\2022.3.62f3` install is **corrupt
 - Two-tap confirm on score cells; no undo after confirm. Ghost potential scores on open cells after each roll. Upper-bonus live progress ("41 / 63").
 - Oma's turns: decisions computed stage-by-stage (`DecideKeepers` per roll, `DecideCategory` at end), watchable 6–12 s pacing, Skip fast-forwards without changing outcomes (deterministic given state).
 
-## Next steps (M3 — Oma plays)
+## M3 (done this session)
 
-1. `OmaAI` in Core (`Assets/Scripts/Core/AI/`): `DecideKeepers(state)` per roll (evaluate all 32 keep-subsets: retention values, straight draws, upper-bonus pace) and `DecideCategory(state)` at turn end (immediate score + weight adjustments per TECH_PLAN §5.6). Must use `GetLegalCategories()` — Joker compliance for free. Sloppiness ε in the API but 0 in v1.
-2. Simulation harness (EditMode test + menu tool): 10,000 self-play games, assert zero illegal actions, report mean/p10/p90; tune weights to ~200–230 average.
-3. `GameController`: Oma's turns run automatically — stage her decisions with 0.5–1.2 s think beats (keepers highlight before reroll, chosen cell flashes), full turn 6–12 s; tap anywhere = skip (fast-forward, decisions unchanged). Input locked during her turn except skip.
-4. Scorecard peeking: during Oma's turn the card zone shows her card; player can toggle to peek at either.
-5. Exit: Oma completes games legally at target strength; turns read clearly; skip works.
+- **`Assets/Scripts/Core/AI/OmaAI.cs`**: staged heuristic per TECH_PLAN §5.6 — `DecideKeepers` (32 keep-subsets: of-a-kind line with upper-bonus bias + Yahtzee chase, straight-draw line, full-house line, chance floor; made-hand stand-pat shortcuts; all-five-kept = stop rolling) and `DecideCategory` (points − per-box opportunity-cost EV table + upper-bonus pace weight + secure-the-63 pull). Pure functions of engine state (deterministic ⇒ skip-safe), query-only, Joker-compliant via `GetLegalCategories()`. ε sloppiness knob in the ctor, 0 in v1. **Strength (untuned first cut): 10k games mean 219.0, median 210, p10 166, p90 271, upper bonus 33.5%/card — in band, no tuning needed.**
+- Editor menu **"Yahtzee/Run Oma Simulation (10k games)"** (`OmaSimulationTool`) re-reports the distribution any time weights change.
+- `GameController`: Oma turn coroutine (think beats 0.18-1.0 s, keepers highlight one-by-one, chosen cell flashes, turn lands in the 6-12 s design window), tap-anywhere **skip** via full-screen overlay (`OnSkipTapped` → fast-forward + `IDiceView.SkipAnimation()`), **peek** toggle (scorecard owner title "YOUR CARD"/"OMA'S CARD"), resume works mid-Oma-turn from a pause-save.
+- Tests: 6 new EditMode (determinism, query-purity, made-hand keeps, Joker legality, junk-roll box protection, 1000-game strength band 200-235) → 94 total; PlayMode reworked for auto-Oma (full game vs her, one-box-per-turn, skip under real pacing, save/reload, illegal taps) → 5 total.
 
-## M2 leftovers (not blocking M3)
+## Next steps (M4 — the kitchen, 3D)
+
+1. **3D physics dice first (top risk)**: `DiceView3D`/`Die3D` behind the existing `IDiceView` — engine-first values, randomized launch impulses from the cup, guided settle in the last ~0.3 s to the engine face, ~2.5 s watchdog hard-snap, kept dice kinematic in the keep row. PlayMode **soak test: 1,000 rolls, rest face must equal engine value every time** (TECH_PLAN §5.4, risk table).
+2. Camera rig with phase framings Default/DiceFocus/ScorecardFocus/OmaFocus, blends ≤0.6 s, input snaps to interactive framing. Open decision at M4 start: Cinemachine (tech-plan recommendation) vs small custom rig.
+3. Gray-box kitchen (table, lamp light, collider fence) until art lands; diegetic world-space scorecard reusing the same ScoreCellView logic.
+4. Keep the 2D layer working behind a debug flag (fast rules testing per TECH_PLAN §7).
+
+## M2 leftovers (not blocking M3/M4)
 
 - Device build untested (M2 exit criterion "playable on device build" verified in editor only — do a real Android build by M4 at the latest).
 - 2D layer stays as debug-flag fallback after M4 per TECH_PLAN §7.
