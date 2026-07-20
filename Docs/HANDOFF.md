@@ -1,7 +1,7 @@
 # Handoff — Yahtzee with Oma
 
 **Last updated:** 2026-07-20 (overnight session)
-**Status:** **M3 complete — Oma plays her own turns.** EditMode 94 + PlayMode 5 all green; 10k-game sim: mean 219.0 (target 200-230), zero illegal actions. Next step: **M4 — the kitchen (3D scene, physics dice, camera rig).**
+**Status:** **M3 complete; M4 well underway** — 3D physics dice PROVEN (1,000-roll soak: every die rests on the engine value), gray-box kitchen matches the concept mockup, Oma character in scene with animation reactions, camera rig with 4 framings, post-final-roll card focus + best-option hints. EditMode 94 + PlayMode 9 all green. Remaining M4: diegetic world-space scorecard, cup pour animation, real kitchen/Oma art, on-device 60 fps pass.
 
 ## What exists
 
@@ -54,12 +54,21 @@ The primary `C:\Program Files\Unity\Hub\Editor\2022.3.62f3` install is **corrupt
 - `GameController`: Oma turn coroutine (think beats 0.18-1.0 s, keepers highlight one-by-one, chosen cell flashes, turn lands in the 6-12 s design window), tap-anywhere **skip** via full-screen overlay (`OnSkipTapped` → fast-forward + `IDiceView.SkipAnimation()`), **peek** toggle (scorecard owner title "YOUR CARD"/"OMA'S CARD"), resume works mid-Oma-turn from a pause-save.
 - Tests: 6 new EditMode (determinism, query-purity, made-hand keeps, Joker legality, junk-roll box protection, 1000-game strength band 200-235) → 94 total; PlayMode reworked for auto-Oma (full game vs her, one-box-per-turn, skip under real pacing, save/reload, illegal taps) → 5 total.
 
-## Next steps (M4 — the kitchen, 3D)
+## M4 groundwork (done this session)
 
-1. **3D physics dice first (top risk)**: `DiceView3D`/`Die3D` behind the existing `IDiceView` — engine-first values, randomized launch impulses from the cup, guided settle in the last ~0.3 s to the engine face, ~2.5 s watchdog hard-snap, kept dice kinematic in the keep row. PlayMode **soak test: 1,000 rolls, rest face must equal engine value every time** (TECH_PLAN §5.4, risk table).
-2. Camera rig with phase framings Default/DiceFocus/ScorecardFocus/OmaFocus, blends ≤0.6 s, input snaps to interactive framing. Open decision at M4 start: Cinemachine (tech-plan recommendation) vs small custom rig.
-3. Gray-box kitchen (table, lamp light, collider fence) until art lands; diegetic world-space scorecard reusing the same ScoreCellView logic.
-4. Keep the 2D layer working behind a debug flag (fast rules testing per TECH_PLAN §7).
+- **3D dice, engine-first (top risk retired)**: `Die3D` (tumble → guided slerp to the engine face in the last ~0.25 s along the shortest arc → 2.5 s watchdog hard-snap) + `DiceView3D` behind the same `IDiceView` (instant path for tests, `SkipAnimation`, 3D tap-to-keep raycast, settled dice keep their natural scatter). **Soak test: 1,000 rolls (5,000 dice) — 100% rest on engine values inside the fence**, plus a mid-tumble skip test.
+- **Gray-box kitchen matching the concept mockup** (`KitchenBuilder`): table, invisible fence+ceiling, warm lamp + fill light, dice cup / game box / Oma's mug / face-down card + pencil props, cube dice with real pip layouts.
+- **Oma is at the table**: 5 Mixamo sitting FBXs at `Assets/Resources/Oma` (`OmaAssetTool` menu "Yahtzee/Setup Oma Assets" configures humanoid rigs, looping idles, generated AnimatorController). `OmaView` cycles idle/shift/talking every 5-12 s; **claps on scores ≥25 or Yahtzee bonuses, disbelief on zeros** (either player). Purple placeholder tint until the real model (M5).
+- **Camera rig decision: custom (not Cinemachine)** — 4 fixed framings + one 0.5 s eased blend coroutine didn't warrant the package; revisit if framing needs grow. Framings tuned against rendered screenshots (`FramingCaptureTests` writes PNGs to persistentDataPath/framings — reusable for any future layout work).
+- **Post-final-roll treatment** (owner request): when the player's rolls are spent, camera eases to ScorecardFocus and the 3 best boxes highlight in soft gold (`OmaAI.RankForHint` — same opportunity-cost valuation Oma uses), status shows "best: X for N".
+- 2D layer intact behind `GameController.Use3dDice = false` (+ regression test).
+
+## Next steps (M4 finish)
+
+1. Diegetic world-space scorecard on the table (replace the compact screen-space panel; same ScoreCellView logic re-parented).
+2. Cup pour: dice launch from inside the cup with a cup tip animation instead of appearing beside it.
+3. Real kitchen environment + Oma low-poly model/textures (owner art) replacing gray-box primitives; camera framing re-check via FramingCaptureTests.
+4. Android device build: 60 fps check, touch input pass (M2 leftover rolls in here).
 
 ## M2 leftovers (not blocking M3/M4)
 

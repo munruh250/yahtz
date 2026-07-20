@@ -202,6 +202,26 @@ namespace Yahtzee.Core
             return value;
         }
 
+        // ---- Hint API (player-facing "best options" after the last roll) ----
+
+        /// <summary>The strongest currently-legal boxes for a hint UI, best first, using the
+        /// same opportunity-cost valuation Oma plays by. Joker-aware for free because it
+        /// reads <see cref="GameEngine.GetPotentialScores"/>.</summary>
+        public static IReadOnlyList<(Category category, int points)> RankForHint(GameEngine engine, int count)
+        {
+            var potentials = engine.GetPotentialScores();
+            var card = engine.CurrentCard;
+            var ranked = new List<(Category category, int points, double value)>();
+            foreach (var pair in potentials)
+                ranked.Add((pair.Key, pair.Value, CategoryValue(pair.Key, pair.Value, card)));
+            ranked.Sort((a, b) => b.value.CompareTo(a.value));
+
+            var result = new List<(Category, int)>();
+            for (int i = 0; i < ranked.Count && i < count; i++)
+                result.Add((ranked[i].category, ranked[i].points));
+            return result;
+        }
+
         // ---- Helpers -------------------------------------------------------
 
         private static bool UpperBonusReachable(Scorecard card)

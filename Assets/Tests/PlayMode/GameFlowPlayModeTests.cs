@@ -26,7 +26,23 @@ namespace Yahtzee.Tests
         public void TearDown()
         {
             GameController.AnimationsEnabled = true;
+            GameController.Use3dDice = true;
             SaveService.Delete();
+        }
+
+        [UnityTest]
+        public IEnumerator LegacyFlatLayer_StillPlaysBehindDebugFlag()
+        {
+            // TECH_PLAN §7: the 2D prototype layer stays available for fast rules testing.
+            GameController.Use3dDice = false;
+            yield return LoadGameScene();
+            var controller = Controller();
+            for (int i = 0; i < 2; i++)
+            {
+                PlayPlayerTurn(controller);
+                yield return WaitForOma(controller);
+            }
+            Assert.AreEqual(3, controller.Engine.State.Round);
         }
 
         private static IEnumerator LoadGameScene()

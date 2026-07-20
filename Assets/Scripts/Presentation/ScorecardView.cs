@@ -28,8 +28,10 @@ namespace Yahtzee.Presentation
 
         /// <summary>Redraw every cell from the card + current potentials. <paramref name="potentials"/>
         /// is null outside the deciding phase (no ghosts, nothing selectable);
-        /// <paramref name="selected"/> is the cell awaiting its confirm tap, if any.</summary>
-        public void Render(Scorecard card, IReadOnlyDictionary<Category, int> potentials, Category? selected)
+        /// <paramref name="selected"/> is the cell awaiting its confirm tap;
+        /// <paramref name="suggested"/> marks the post-final-roll best-option hints.</summary>
+        public void Render(Scorecard card, IReadOnlyDictionary<Category, int> potentials, Category? selected,
+            ICollection<Category> suggested = null)
         {
             foreach (var pair in _cells)
             {
@@ -44,6 +46,8 @@ namespace Yahtzee.Presentation
                 {
                     if (selected == category)
                         cell.ShowSelected(ghost);
+                    else if (suggested != null && suggested.Contains(category))
+                        cell.ShowSuggested(ghost);
                     else
                         cell.ShowOpen(ghost, selectable: true);
                 }

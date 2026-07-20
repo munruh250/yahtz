@@ -44,6 +44,16 @@ namespace Yahtzee.Presentation
             _button.interactable = selectable;
         }
 
+        /// <summary>Post-final-roll hint: one of the best boxes to take (soft gold).</summary>
+        public void ShowSuggested(int ghostScore)
+        {
+            _background.color = UiPalette.GoldSoft;
+            _value.text = ghostScore.ToString();
+            _value.color = UiPalette.Ink;
+            _value.fontStyle = FontStyles.Bold;
+            _button.interactable = true;
+        }
+
         public void ShowSelected(int ghostScore)
         {
             _background.color = UiPalette.Gold;

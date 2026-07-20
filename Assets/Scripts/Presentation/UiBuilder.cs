@@ -15,6 +15,7 @@ namespace Yahtzee.Presentation
     {
         public sealed class Refs
         {
+            /// <summary>Null when built for world-space (3D) dice.</summary>
             public DiceView2D Dice;
             public ScorecardView Scorecard;
             public HudView Hud;
@@ -29,7 +30,10 @@ namespace Yahtzee.Presentation
             "Yahtzee", "Chance",
         };
 
-        public static Refs Build(Transform root, GameController controller)
+        /// <summary>Builds the screen-space UI. With <paramref name="worldDice"/> the canvas
+        /// has no background or 2D dice row (the camera shows the kitchen through that band)
+        /// and the scorecard compacts into the lower third.</summary>
+        public static Refs Build(Transform root, GameController controller, bool worldDice = false)
         {
             EnsureEventSystem();
 
@@ -42,15 +46,17 @@ namespace Yahtzee.Presentation
             scaler.referenceResolution = new Vector2(1080f, 2340f);
             scaler.matchWidthOrHeight = 0.5f;
 
-            Image(canvasGo.transform, "Background", Vector2.zero, Vector2.one, UiPalette.Background);
+            if (!worldDice)
+                Image(canvasGo.transform, "Background", Vector2.zero, Vector2.one, UiPalette.Background);
 
             var safe = Rect(canvasGo.transform, "SafeArea", Vector2.zero, Vector2.one);
             safe.gameObject.AddComponent<SafeAreaFitter>();
 
             var refs = new Refs();
             BuildHeaderAndStatus(safe, out var header, out var status);
-            refs.Dice = BuildDiceRow(safe, controller);
-            refs.Scorecard = BuildScorecard(safe, controller);
+            if (!worldDice)
+                refs.Dice = BuildDiceRow(safe, controller);
+            refs.Scorecard = BuildScorecard(safe, controller, worldDice);
             BuildActionBar(safe, controller, out var rollButton, out var rollLabel);
 
             // Sibling order = raycast/draw order: skip overlay above the play surface,
@@ -109,9 +115,12 @@ namespace Yahtzee.Presentation
             return view;
         }
 
-        private static ScorecardView BuildScorecard(RectTransform parent, GameController controller)
+        private static ScorecardView BuildScorecard(RectTransform parent, GameController controller, bool compact)
         {
-            var outer = Image(parent, "Scorecard", new Vector2(0.02f, 0.115f), new Vector2(0.98f, 0.77f), UiPalette.Panel).rectTransform;
+            // Compact (3D) mode leaves the 0.47-0.90 band open so the camera's view of the
+            // table dice shows through the transparent canvas.
+            var top = compact ? 0.47f : 0.77f;
+            var outer = Image(parent, "Scorecard", new Vector2(0.02f, 0.115f), new Vector2(0.98f, top), UiPalette.Panel).rectTransform;
             var view = outer.gameObject.AddComponent<ScorecardView>();
             var title = Text(outer, "Owner", "YOUR CARD", 28f, UiPalette.CreamDim, TextAlignmentOptions.Center,
                 new Vector2(0f, 0.945f), new Vector2(1f, 1f));

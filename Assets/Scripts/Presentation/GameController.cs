@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using Yahtzee.Core;
 using Yahtzee.Services;
@@ -17,6 +18,10 @@ namespace Yahtzee.Presentation
         /// <summary>Tests set this false to make every animation and think-beat instant.</summary>
         public static bool AnimationsEnabled = true;
 
+        /// <summary>Debug flag (TECH_PLAN §7): true = physical dice in the 3D kitchen;
+        /// false = the M2 2D sprite layer, kept alive for fast rules testing.</summary>
+        public static bool Use3dDice = true;
+
         public GameEngine Engine { get; private set; }
 
         /// <summary>True while a roll animation owns the screen.</summary>
@@ -32,6 +37,8 @@ namespace Yahtzee.Presentation
         private IDiceView _dice;
         private ScorecardView _scorecard;
         private HudView _hud;
+        private CameraDirector _cameraDirector; // null in 2D mode
+        private OmaView _omaView;               // null in 2D mode or before assets import
 
         private Category? _selected;   // player's pending confirm, or Oma's flash
         private bool _peekOther;       // scorecard shows the non-current player's card
@@ -42,10 +49,20 @@ namespace Yahtzee.Presentation
         private void Awake()
         {
             Application.targetFrameRate = 60;
-            var refs = UiBuilder.Build(transform, this);
-            _dice = refs.Dice;
+            var refs = UiBuilder.Build(transform, this, Use3dDice);
             _scorecard = refs.Scorecard;
             _hud = refs.Hud;
+            if (Use3dDice)
+            {
+                var kitchen = KitchenBuilder.Build(transform, this, Camera.main);
+                _dice = kitchen.Dice;
+                _cameraDirector = kitchen.CameraDirector;
+                _omaView = kitchen.Oma;
+            }
+            else
+            {
+                _dice = refs.Dice;
+            }
         }
 
         private void Start()
@@ -227,6 +244,7 @@ namespace Yahtzee.Presentation
             switch (gameEvent)
             {
                 case DiceRolled rolled:
+                    _cameraDirector?.Set(CameraDirector.Framing.DiceFocus);
                     _dice.PlayRoll(rolled.Values, Engine.State.Dice.Kept, OnDiceSettled);
                     break;
                 case JokerActivated joker:
@@ -235,19 +253,24 @@ namespace Yahtzee.Presentation
                 case ScoreCommitted committed:
                     if (committed.YahtzeeBonusAwarded)
                         _toast = "Yahtzee bonus +100! ";
+                    ReactToScore(committed);
                     break;
                 case UpperBonusSecured bonus:
                     _toast = $"{(bonus.Player == PlayerId.Player ? "Your" : "Oma's")} upper bonus +35! ";
                     break;
-                case TurnChanged _:
+                case TurnChanged turn:
                     SaveService.Save(Engine.State);
                     _peekOther = false;
+                    _cameraDirector?.Set(turn.Player == PlayerId.Oma
+                        ? CameraDirector.Framing.OmaFocus
+                        : CameraDirector.Framing.Default);
                     RefreshAll();
                     if (IsOmaTurn && _omaRoutine == null)
                         _omaRoutine = StartCoroutine(OmaTurnRoutine());
                     break;
                 case GameEnded ended:
                     SaveService.Save(Engine.State);
+                    _cameraDirector?.Set(CameraDirector.Framing.OmaFocus);
                     RefreshAll();
                     _hud.ShowGameOver(ended);
                     break;
@@ -257,7 +280,24 @@ namespace Yahtzee.Presentation
         private void OnDiceSettled()
         {
             InputLocked = false;
+            // Out of rolls on the player's turn: ease toward the card and hint the best
+            // boxes (user-requested treatment; suggestions computed in RefreshAll).
+            if (!IsOmaTurn && Engine.RollsRemaining == 0 && Engine.State.Phase == GamePhase.Deciding)
+                _cameraDirector?.Set(CameraDirector.Framing.ScorecardFocus);
             RefreshAll();
+        }
+
+        /// <summary>Oma reacts to committed scores: applause for a strong score, disbelief
+        /// for a zero — hers or yours (she's invested either way).</summary>
+        private void ReactToScore(ScoreCommitted committed)
+        {
+            if (_omaView == null)
+                return;
+            bool great = committed.Points >= 25 || committed.YahtzeeBonusAwarded;
+            if (great)
+                _omaView.PlayReaction(OmaView.Reaction.Clap);
+            else if (committed.Points == 0)
+                _omaView.PlayReaction(OmaView.Reaction.Disbelief);
         }
 
         // ---- Rendering -----------------------------------------------------
@@ -273,6 +313,15 @@ namespace Yahtzee.Presentation
             bool showPotentials = !_peekOther && deciding && !InputLocked;
             var potentials = showPotentials ? Engine.GetPotentialScores() : null;
 
+            // Best-option hints once the player's rolls are spent.
+            List<Category> suggested = null;
+            if (showPotentials && !IsOmaTurn && Engine.RollsRemaining == 0)
+            {
+                suggested = new List<Category>();
+                foreach (var (category, _) in OmaAI.RankForHint(Engine, 3))
+                    suggested.Add(category);
+            }
+
             _hud.SetHeader(state);
             _hud.SetRoll(!InputLocked && !IsOmaTurn && state.Phase != GamePhase.GameOver && Engine.RollsRemaining > 0,
                 Engine.RollsRemaining);
@@ -280,9 +329,9 @@ namespace Yahtzee.Presentation
             _hud.SetPeek(state.Phase != GamePhase.GameOver, PeekLabel(state));
             _dice.SetDice(state.Dice.Values, state.Dice.Kept);
             _dice.SetInteractable(!InputLocked && !IsOmaTurn && deciding && Engine.RollsRemaining > 0);
-            _scorecard.Render(displayedCard, potentials, _selected);
+            _scorecard.Render(displayedCard, potentials, _selected, suggested);
             _scorecard.SetOwner(OwnerLabel(state, displayedCard));
-            _hud.SetStatus(BuildStatus(deciding, potentials));
+            _hud.SetStatus(BuildStatus(deciding, potentials, suggested));
             _toast = null;
         }
 
@@ -297,7 +346,8 @@ namespace Yahtzee.Presentation
         private static string OwnerLabel(GameState state, Scorecard displayed) =>
             displayed == state.PlayerCard ? "YOUR CARD" : "OMA'S CARD";
 
-        private string BuildStatus(bool deciding, System.Collections.Generic.IReadOnlyDictionary<Category, int> potentials)
+        private string BuildStatus(bool deciding, System.Collections.Generic.IReadOnlyDictionary<Category, int> potentials,
+            List<Category> suggested = null)
         {
             var state = Engine.State;
             string toast = _toast ?? "";
@@ -319,8 +369,10 @@ namespace Yahtzee.Presentation
                 return JokerRules.BonusApplies(Engine.CurrentCard)
                     ? "Joker rules! +100 bonus - you must use a highlighted box"
                     : "Joker rules! You must use a highlighted box";
-            return Engine.RollsRemaining > 0
-                ? $"{toast}Roll {state.Dice.RollsUsed} of 3 done - keep dice, roll again, or score"
+            if (Engine.RollsRemaining > 0)
+                return $"{toast}Roll {state.Dice.RollsUsed} of 3 done - keep dice, roll again, or score";
+            return suggested != null && suggested.Count > 0 && potentials != null
+                ? $"{toast}No rolls left - best: {UiBuilder.DisplayName(suggested[0])} for {potentials[suggested[0]]}"
                 : $"{toast}Choose a score";
         }
 

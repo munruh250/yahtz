@@ -13,6 +13,7 @@ namespace Yahtzee.Presentation
         public static readonly Color Ink = Hex("3B2C1A");
         public static readonly Color InkGhost = Hex("9C8F73");
         public static readonly Color Gold = Hex("E4B54A");
+        public static readonly Color GoldSoft = Hex("EDD9A8");
         public static readonly Color GoldDark = Hex("B8892E");
         public static readonly Color DieFace = Hex("FAF6EA");
         public static readonly Color DiePip = Hex("33261A");
