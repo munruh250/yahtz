@@ -17,13 +17,11 @@ namespace Yahtzee.Presentation
         private GameObject _gameOverPanel;
         private TextMeshProUGUI _gameOverText;
         private GameObject _skipOverlay;
-        private GameObject _peekButton;
-        private TextMeshProUGUI _peekLabel;
         private Button _askButton;
 
         public void Init(Button rollButton, TextMeshProUGUI rollLabel, TextMeshProUGUI status,
             TextMeshProUGUI header, GameObject gameOverPanel, TextMeshProUGUI gameOverText,
-            GameObject skipOverlay, GameObject peekButton, TextMeshProUGUI peekLabel, Button askButton)
+            GameObject skipOverlay, Button askButton)
         {
             _askButton = askButton;
             _rollButton = rollButton;
@@ -33,8 +31,6 @@ namespace Yahtzee.Presentation
             _gameOverPanel = gameOverPanel;
             _gameOverText = gameOverText;
             _skipOverlay = skipOverlay;
-            _peekButton = peekButton;
-            _peekLabel = peekLabel;
             _gameOverPanel.SetActive(false);
             _skipOverlay.SetActive(false);
         }
@@ -42,12 +38,6 @@ namespace Yahtzee.Presentation
         /// <summary>During Oma's turn a full-screen transparent overlay turns any tap into
         /// Skip (design §4); the peek toggle sits above it and stays tappable.</summary>
         public void SetOmaTurn(bool omaTurn) => _skipOverlay.SetActive(omaTurn);
-
-        public void SetPeek(bool visible, string label)
-        {
-            _peekButton.SetActive(visible);
-            _peekLabel.text = label;
-        }
 
         public void SetRoll(bool enabled, int rollsRemaining)
         {

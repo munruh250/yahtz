@@ -44,6 +44,7 @@ namespace Yahtzee.Presentation
 
         public void SetDice(int[] values, bool[] kept)
         {
+            bool placed = false;
             for (int i = 0; i < _dice.Length; i++)
             {
                 var die = _dice[i];
@@ -66,7 +67,13 @@ namespace Yahtzee.Presentation
 
                 die.PlaceAt(kept[i] ? _keepSlots[i] : _restSlots[i], values[i], DeterministicYaw(i, values[i]));
                 _placedKept[i] = kept[i];
+                placed = true;
             }
+
+            // Releasing a kept die drops it back on its rest slot, which another die may have
+            // drifted onto during the throw — so re-separate whenever anything was placed.
+            if (placed)
+                Unstack();
         }
 
         public void PlayRoll(int[] values, bool[] kept, Action onSettled)
@@ -90,13 +97,16 @@ namespace Yahtzee.Presentation
                     continue;
                 }
                 _placedKept[i] = false;
-                // Randomized pour toward the table center; guidance handles the rest. Kept
-                // deliberately gentle: in the tight roll zone a harder throw just pinballs off
-                // the walls, and values that skitter around are hard to read.
-                var from = _cupPosition + new Vector3(Rnd(-0.03f, 0.03f), Rnd(0f, 0.05f), Rnd(-0.03f, 0.03f));
+                // Tossed underarm from the player's edge of the table, away from the camera.
+                // Speed is set explicitly rather than scaled by the distance to the target slot:
+                // the throw now starts close to those slots, so a distance-scaled impulse would
+                // barely move the dice. Kept gentle — in a tight roll zone a harder throw just
+                // pinballs off the walls and the values skitter about.
+                var from = _cupPosition + new Vector3(Rnd(-0.10f, 0.10f), Rnd(0f, 0.05f), Rnd(-0.02f, 0.02f));
                 var target = _restSlots[i];
-                var flat = new Vector3(target.x - from.x, 0f, target.z - from.z);
-                var velocity = flat * Rnd(1.4f, 1.9f) + Vector3.up * Rnd(0.20f, 0.40f);
+                var toTarget = new Vector3(target.x - from.x, 0f, target.z - from.z);
+                var heading = toTarget.sqrMagnitude > 1e-4f ? toTarget.normalized : Vector3.forward;
+                var velocity = heading * Rnd(0.60f, 0.95f) + Vector3.up * Rnd(0.55f, 0.85f);
                 var spin = new Vector3(Rnd(-12f, 12f), Rnd(-12f, 12f), Rnd(-12f, 12f));
                 _dice[i].LaunchRoll(values[i], from, velocity, spin);
             }

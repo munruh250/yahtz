@@ -228,6 +228,16 @@ namespace Yahtzee.Presentation
             RefreshAll();
             if (ShouldPace) yield return ThinkBeat(0.6f);
 
+            // A good hand deserves a look. Scoring clears the dice, so celebrate BEFORE
+            // committing and hold long enough for her clap to play and for the player to
+            // actually read what she rolled.
+            var potentials = Engine.GetPotentialScores();
+            if (potentials.TryGetValue(category, out int points) && points >= 25)
+            {
+                _omaView?.PlayReaction(OmaView.Reaction.Clap);
+                if (ShouldPace) yield return ThinkBeat(2.2f);
+            }
+
             _selected = null;
             _omaRoutine = null;
             Engine.ScoreCategory(category); // advances turn; events refresh the screen
@@ -312,16 +322,16 @@ namespace Yahtzee.Presentation
             RefreshAll();
         }
 
-        /// <summary>Oma reacts to committed scores: applause for a strong score, disbelief
-        /// for a zero — hers or yours (she's invested either way).</summary>
+        /// <summary>Oma reacts to YOUR scores. She claps for herself — that happens in
+        /// <see cref="OmaTurnRoutine"/> while her dice are still on the table — so what is left
+        /// here is her reaction to you, and it is disbelief either way: mock outrage at a big
+        /// score, sympathy at a zero. She is a playfully competitive grandmother.</summary>
         private void ReactToScore(ScoreCommitted committed)
         {
-            if (_omaView == null)
+            if (_omaView == null || committed.Player != PlayerId.Player)
                 return;
-            bool great = committed.Points >= 25 || committed.YahtzeeBonusAwarded;
-            if (great)
-                _omaView.PlayReaction(OmaView.Reaction.Clap);
-            else if (committed.Points == 0)
+            bool notable = committed.Points >= 25 || committed.YahtzeeBonusAwarded || committed.Points == 0;
+            if (notable)
                 _omaView.PlayReaction(OmaView.Reaction.Disbelief);
         }
 
@@ -332,9 +342,10 @@ namespace Yahtzee.Presentation
             var state = Engine.State;
             bool deciding = state.Phase == GamePhase.Deciding;
 
-            var displayedCard = _peekOther
-                ? (state.CurrentPlayer == PlayerId.Player ? state.OmaCard : state.PlayerCard)
-                : Engine.CurrentCard;
+            // The card on the table is YOURS. It used to follow the current player, which meant
+            // Oma's scores were on show throughout her turn; hers is now only visible while you
+            // are deliberately peeking at her card prop.
+            var displayedCard = _peekOther ? state.OmaCard : state.PlayerCard;
             bool showPotentials = !_peekOther && deciding && !InputLocked;
             var potentials = showPotentials ? Engine.GetPotentialScores() : null;
 
@@ -351,7 +362,6 @@ namespace Yahtzee.Presentation
             _hud.SetRoll(!InputLocked && !IsOmaTurn && state.Phase != GamePhase.GameOver && Engine.RollsRemaining > 0,
                 Engine.RollsRemaining);
             _hud.SetOmaTurn(IsOmaTurn);
-            _hud.SetPeek(state.Phase != GamePhase.GameOver, PeekLabel(state));
             _hud.SetAskOma(CanAskOma);
             _dice.SetDice(state.Dice.Values, state.Dice.Kept);
             _dice.SetInteractable(!InputLocked && !IsOmaTurn && deciding && Engine.RollsRemaining > 0);
@@ -359,14 +369,6 @@ namespace Yahtzee.Presentation
             _scorecard.SetOwner(OwnerLabel(state, displayedCard));
             _hud.SetStatus(BuildStatus(deciding, potentials, suggested));
             _toast = null;
-        }
-
-        private string PeekLabel(GameState state)
-        {
-            if (_peekOther)
-                return "Back";
-            bool otherIsOma = state.CurrentPlayer == PlayerId.Player;
-            return otherIsOma ? "Peek: Oma" : "Peek: You";
         }
 
         private static string OwnerLabel(GameState state, Scorecard displayed) =>
@@ -388,7 +390,7 @@ namespace Yahtzee.Presentation
             if (InputLocked)
                 return "Rolling...";
             if (_peekOther)
-                return "Peeking at Oma's card";
+                return "Oma's card - tap it again to go back";
             if (_selected.HasValue && potentials != null)
                 return $"{toast}Tap again to confirm: {UiBuilder.DisplayName(_selected.Value)} for {potentials[_selected.Value]}";
             if (Engine.IsJokerTurn)

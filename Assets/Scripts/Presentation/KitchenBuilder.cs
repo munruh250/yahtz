@@ -39,22 +39,31 @@ namespace Yahtzee.Presentation
         private const float SlotSpacingX = 0.12f;
         private static float RollZoneCenterZ => (RollZoneMinZ + RollZoneMaxZ) / 2f;
 
-        // Dice pour in from beside the (visual) cup, but inside the fence — outside it they
-        // would land on the wrong side of a wall and never reach the table.
-        private static readonly Vector3 CupPosition = new Vector3(0.26f, 0.30f, 0.27f);
+        /// <summary>Where a throw starts: low, centred, at the player's near edge of the play
+        /// area, so the dice come off *your* side of the table and tumble away from the camera.
+        /// It has to sit inside the fence — the walls are what keep the dice on the table, so a
+        /// throw starting behind one would simply bounce off it and never arrive.</summary>
+        private static readonly Vector3 ThrowOrigin = new Vector3(0f, 0.10f, RollZoneMinZ + 0.02f);
 
         public static Refs Build(Transform parent, GameController controller, Camera camera)
         {
             var root = new GameObject("Kitchen3D").transform;
             root.SetParent(parent, false);
 
+            BuildRoom(root);
             BuildTable(root);
             BuildFence(root);
             BuildLamp(root);
-            BuildProps(root);
+            BuildProps(root, controller);
             var oma = BuildOma(root);
             var dice = BuildDice(root, controller, camera);
             var scorecard = ScorecardBuilder.BuildWorld(root, controller, camera);
+
+            // Props stay tappable whenever the player is in charge — you can peek at Oma's card
+            // before rolling or after your rolls are spent, unlike the dice.
+            if (controller != null)
+                root.gameObject.AddComponent<WorldTapInput>()
+                    .Init(camera, () => !controller.InputLocked && !controller.IsOmaTurn);
 
             var director = root.gameObject.AddComponent<CameraDirector>();
             director.Init(camera, new[]
@@ -78,7 +87,7 @@ namespace Yahtzee.Presentation
 
         /// <summary>Set dressing per the concept mockup: black dice cup (right), game box
         /// (left, outside the fence), Oma's mug and face-down scorecard on her side.</summary>
-        private static void BuildProps(Transform root)
+        private static void BuildProps(Transform root, GameController controller)
         {
             var cup = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             cup.name = "DiceCup";
@@ -105,23 +114,129 @@ namespace Yahtzee.Presentation
             mug.GetComponent<Renderer>().material = Mat(new Color(0.92f, 0.90f, 0.85f));
             RemoveCollider(mug);
 
+            // Oma's card KEEPS its collider — tapping it is how you peek at her scores, so it is
+            // the one prop that must stay hittable. Scaled up a little from a true card so it is
+            // a comfortable touch target across the table.
             var omaCard = GameObject.CreatePrimitive(PrimitiveType.Cube);
             omaCard.name = "OmaScorecardProp";
             omaCard.transform.SetParent(root, false);
-            omaCard.transform.localPosition = new Vector3(0.02f, TableY + 0.003f, 0.60f);
+            omaCard.transform.localPosition = new Vector3(0.02f, TableY + 0.006f, 0.58f);
             omaCard.transform.localRotation = Quaternion.Euler(0f, -6f, 0f);
-            omaCard.transform.localScale = new Vector3(0.16f, 0.004f, 0.24f);
+            omaCard.transform.localScale = new Vector3(0.26f, 0.012f, 0.34f);
             omaCard.GetComponent<Renderer>().material = Mat(new Color(0.93f, 0.89f, 0.78f));
-            RemoveCollider(omaCard);
+            if (controller != null)
+                omaCard.AddComponent<TappableProp>().Init(controller.OnPeekTapped);
 
+            AddPencil(root, "OmaPencil", new Vector3(0.24f, TableY + 0.008f, 0.56f), 15f);
+            // Your own pencil, resting beside your card on your side of the table.
+            AddPencil(root, "PlayerPencil", new Vector3(0.31f, TableY + 0.008f, -0.46f), -22f);
+        }
+
+        private static void AddPencil(Transform root, string name, Vector3 position, float yaw)
+        {
             var pencil = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            pencil.name = "OmaPencil";
+            pencil.name = name;
             pencil.transform.SetParent(root, false);
-            pencil.transform.localPosition = new Vector3(0.14f, TableY + 0.008f, 0.58f);
-            pencil.transform.localRotation = Quaternion.Euler(90f, 15f, 0f);
+            pencil.transform.localPosition = position;
+            pencil.transform.localRotation = Quaternion.Euler(90f, yaw, 0f);
             pencil.transform.localScale = new Vector3(0.012f, 0.07f, 0.012f);
             pencil.GetComponent<Renderer>().material = Mat(new Color(0.85f, 0.65f, 0.15f));
             RemoveCollider(pencil);
+        }
+
+        /// <summary>The kitchen behind Oma: back wall, a frosted window (night outside, so it
+        /// reads as a soft glow rather than a view), and two framed samplers of the sort that
+        /// hang in a German grandmother's kitchen — house blessings about God and daily bread.
+        /// Gray-box stand-ins for the real low-poly art.</summary>
+        private static void BuildRoom(Transform root)
+        {
+            const float wallZ = 1.90f;
+            // Everything hangs between roughly y 0.1 and 0.8: from the seated camera the table's
+            // far edge cuts the wall off below that, and the top of the screen cuts it off above.
+
+            var wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            wall.name = "BackWall";
+            wall.transform.SetParent(root, false);
+            wall.transform.localPosition = new Vector3(0f, 0.70f, wallZ);
+            wall.transform.localScale = new Vector3(5.2f, 3.4f, 0.10f);
+            wall.GetComponent<Renderer>().material = Mat(new Color(0.50f, 0.44f, 0.36f));
+            RemoveCollider(wall);
+
+            // Window: a dark frame with a pale, softly lit pane. Frosted, so it needs no scenery
+            // behind it — which also keeps the scene cheap on a phone.
+            var frame = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            frame.name = "WindowFrame";
+            frame.transform.SetParent(root, false);
+            frame.transform.localPosition = new Vector3(-0.52f, 0.52f, wallZ - 0.06f);
+            frame.transform.localScale = new Vector3(0.58f, 0.72f, 0.05f);
+            frame.GetComponent<Renderer>().material = Mat(new Color(0.20f, 0.15f, 0.11f));
+            RemoveCollider(frame);
+
+            var pane = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            pane.name = "FrostedPane";
+            pane.transform.SetParent(root, false);
+            pane.transform.localPosition = new Vector3(-0.52f, 0.52f, wallZ - 0.09f);
+            pane.transform.localScale = new Vector3(0.48f, 0.62f, 0.02f);
+            pane.GetComponent<Renderer>().material = Mat(new Color(0.78f, 0.83f, 0.84f));
+            RemoveCollider(pane);
+
+            // Glazing bars, so it reads as a window rather than a lit rectangle.
+            AddGlazingBar(root, new Vector3(-0.52f, 0.52f, wallZ - 0.10f), new Vector3(0.50f, 0.025f, 0.02f));
+            AddGlazingBar(root, new Vector3(-0.52f, 0.52f, wallZ - 0.10f), new Vector3(0.025f, 0.64f, 0.02f));
+
+            AddSampler(root, new Vector3(0.54f, 0.66f, wallZ - 0.06f), 0.42f, "Gott segne\ndieses Haus");
+            AddSampler(root, new Vector3(0.54f, 0.24f, wallZ - 0.06f), 0.38f, "Unser täglich Brot\ngib uns heute");
+        }
+
+        private static void AddGlazingBar(Transform root, Vector3 position, Vector3 scale)
+        {
+            var bar = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            bar.name = "GlazingBar";
+            bar.transform.SetParent(root, false);
+            bar.transform.localPosition = position;
+            bar.transform.localScale = scale;
+            bar.GetComponent<Renderer>().material = Mat(new Color(0.20f, 0.15f, 0.11f));
+            RemoveCollider(bar);
+        }
+
+        /// <summary>A framed cross-stitch sampler: dark frame, cream linen mat, stitched text.
+        /// The lettering is a world-space canvas, which renders unlit — which happens to suit
+        /// embroidery on a dim wall.</summary>
+        private static void AddSampler(Transform root, Vector3 position, float width, string text)
+        {
+            float height = width * 0.62f;
+
+            var frame = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            frame.name = "SamplerFrame";
+            frame.transform.SetParent(root, false);
+            frame.transform.localPosition = position;
+            frame.transform.localScale = new Vector3(width, height, 0.04f);
+            frame.GetComponent<Renderer>().material = Mat(new Color(0.26f, 0.16f, 0.09f));
+            RemoveCollider(frame);
+
+            var mat = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            mat.name = "SamplerMat";
+            mat.transform.SetParent(root, false);
+            mat.transform.localPosition = position + new Vector3(0f, 0f, -0.02f);
+            mat.transform.localScale = new Vector3(width * 0.88f, height * 0.84f, 0.02f);
+            mat.GetComponent<Renderer>().material = Mat(new Color(0.90f, 0.86f, 0.75f));
+            RemoveCollider(mat);
+
+            var canvasGo = new GameObject("SamplerText", typeof(Canvas));
+            canvasGo.transform.SetParent(root, false);
+            var canvas = canvasGo.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+
+            var rect = (RectTransform)canvasGo.transform;
+            rect.sizeDelta = new Vector2(400f, 400f * height / width);
+            rect.localScale = Vector3.one * ((width * 0.84f) / 400f);
+            // No rotation: a canvas is read from the side its forward points AWAY from, and the
+            // player sits at -Z. Turning it to "face" them mirrors the text.
+            rect.localPosition = position + new Vector3(0f, 0f, -0.04f);
+
+            var label = UiBuilder.Text(rect, "Text", text, 56f, new Color(0.34f, 0.22f, 0.14f),
+                TMPro.TextAlignmentOptions.Center, Vector2.zero, Vector2.one);
+            label.enableWordWrapping = true;
         }
 
         /// <summary>Instantiates the animated Oma character seated across the table (concept
@@ -254,7 +369,7 @@ namespace Yahtzee.Presentation
                 dice[i] = die;
             }
 
-            view.Init(dice, camera, controller, CupPosition, restSlots, keepSlots, keepMarkers);
+            view.Init(dice, camera, controller, ThrowOrigin, restSlots, keepSlots, keepMarkers);
             return view;
         }
 

@@ -67,12 +67,11 @@ namespace Yahtzee.Presentation
             // Sibling order = raycast/draw order: skip overlay above the play surface,
             // peek toggle above the overlay, game-over scrim above everything.
             var skipOverlay = BuildSkipOverlay(safe, controller);
-            BuildPeekButton(safe, controller, out var peekButton, out var peekLabel);
             BuildGameOver(safe, controller, out var gameOverPanel, out var gameOverText);
 
             refs.Hud = safe.gameObject.AddComponent<HudView>();
             refs.Hud.Init(rollButton, rollLabel, status, header, gameOverPanel, gameOverText,
-                skipOverlay, peekButton, peekLabel, askButton);
+                skipOverlay, askButton);
             return refs;
         }
 
@@ -134,17 +133,6 @@ namespace Yahtzee.Presentation
             button.transition = Selectable.Transition.None;
             button.onClick.AddListener(controller.OnSkipTapped);
             return overlay.gameObject;
-        }
-
-        private static void BuildPeekButton(RectTransform parent, GameController controller, out GameObject button, out TextMeshProUGUI label)
-        {
-            var bg = Image(parent, "PeekButton", new Vector2(0.76f, 0.948f), new Vector2(0.98f, 0.992f), UiPalette.Panel);
-            var peek = bg.gameObject.AddComponent<Button>();
-            peek.targetGraphic = bg;
-            peek.onClick.AddListener(controller.OnPeekTapped);
-            label = Text(bg.rectTransform, "Label", "Peek: Oma", 30f, UiPalette.Cream, TextAlignmentOptions.Center,
-                Vector2.zero, Vector2.one);
-            button = bg.gameObject;
         }
 
         private static void BuildActionBar(RectTransform parent, GameController controller,

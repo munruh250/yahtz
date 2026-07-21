@@ -26,6 +26,10 @@ namespace Yahtzee.Presentation
         /// <summary>Whose card is on screen ("YOUR CARD" / "OMA'S CARD") — matters for peeking.</summary>
         public void SetOwner(string label) => _title.text = label;
 
+        /// <summary>Whose card is currently rendered. Exposed so tests can assert that Oma's
+        /// scores never appear unless the player deliberately peeked.</summary>
+        public string Owner => _title == null ? "" : _title.text;
+
         /// <summary>Redraw every cell from the card + current potentials. <paramref name="potentials"/>
         /// is null outside the deciding phase (no ghosts, nothing selectable);
         /// <paramref name="selected"/> is the cell awaiting its confirm tap;

@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-07-20
 **Status:** M1–M3 complete, **M4 ~75%**. The game is fully playable end-to-end in the 3D kitchen scene vs. an auto-playing Oma, and the scorecard is now a physical object on the table.
-**Test baseline (must stay green):** EditMode **101**, PlayMode **19**. Run them with `Tools\run-tests.ps1` — no need to close the editor.
+**Test baseline (must stay green):** EditMode **101**, PlayMode **22**. Run them with `Tools\run-tests.ps1` — no need to close the editor.
 **Next task:** M4 finish — see [What's left](#whats-left), item 1 (cup pour).
 
 ---
@@ -164,6 +164,8 @@ Results XML parses with `[xml]$r = Get-Content out.xml; $r."test-run"` → `tota
 | **DiceFocus is transient — camera eases back on settle** (M4) | *Owner approved 2026-07-20; supersedes the literal reading of design §5.2 ("push in over the dice **when they settle**").* A physical card means any framing the player can score from must show all 13 boxes, and DiceFocus crops it badly (verified in the renders). The push-in now plays during the tumble and eases to Default once dice rest, where dice stay clearly legible. Rejected alternative: hold the push-in ~0.8 s then ease back — more literal to the spec, but boxes are unreachable during the hold, so a tap can land on nothing |
 | **UI built in code, not prefabs** (M2) | The 2D layer is throwaway scaffolding; code keeps the whole layout reviewable and diffable |
 | German flavor phrases in Oma's dialogue | Owner approved; flavor only, never rules-critical; game stays English-only |
+| **Peeking is diegetic — tap Oma's card, no button** (M4) | Owner request. The card on the table is always *yours*; it used to follow the current player, so her scores were on show for her whole turn. **Discoverability risk:** nothing on screen says her card is tappable — worth a line in the M6 how-to-play |
+| **Oma is astonished at you, and claps for herself** (M4) | Owner request: a big score from the player triggers *disbelief*, not applause — she is playfully competitive. Her own good hands get the clap, played **before** the score commits so the dice are still on the table and the animation has room to run |
 | **"Ask Oma" hint is free and unlimited** | Owner-requested. She runs `OmaAI.Advise` — the *same* subset evaluator she plays by, so she gives away her own reasoning rather than peeking at anything hidden. It is a pure query: no RNG draws, no mutation (asserted in `OmaAdviceTests` / `AskOmaTests`), so a player who asks every turn gets identical dice to one who never asks. No cost/limit, matching the cozy no-meta decision |
 | Restart = no consequence; no stats/meta/monetization in v1 | Owner decision; cozy game |
 | Trademark flag | "Yahtzee" is Hasbro's; possible rename pre-release; no Hasbro assets ever |
