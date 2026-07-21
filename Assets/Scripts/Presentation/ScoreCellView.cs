@@ -47,7 +47,7 @@ namespace Yahtzee.Presentation
         /// <summary>Post-final-roll hint: one of the best boxes to take (soft gold).</summary>
         public void ShowSuggested(int ghostScore)
         {
-            _background.color = UiPalette.GoldSoft;
+            _background.color = UiPalette.AccentSoft;
             _value.text = ghostScore.ToString();
             _value.color = UiPalette.InkDark;
             _value.fontStyle = FontStyles.Bold;
@@ -56,7 +56,7 @@ namespace Yahtzee.Presentation
 
         public void ShowSelected(int ghostScore)
         {
-            _background.color = UiPalette.Gold;
+            _background.color = UiPalette.Accent;
             _value.text = ghostScore.ToString();
             _value.color = UiPalette.InkDark;
             _value.fontStyle = FontStyles.Bold;
@@ -68,7 +68,7 @@ namespace Yahtzee.Presentation
             // Extra marker after the name, e.g. Yahtzee bonus chips "x2".
             _name.text = string.IsNullOrEmpty(suffix)
                 ? _baseName
-                : $"{_baseName}<color=#{ColorUtility.ToHtmlStringRGB(UiPalette.GoldDark)}> {suffix}</color>";
+                : $"{_baseName}<color=#{ColorUtility.ToHtmlStringRGB(UiPalette.AccentDeep)}> {suffix}</color>";
         }
     }
 }

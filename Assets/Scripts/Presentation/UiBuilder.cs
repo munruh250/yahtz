@@ -50,7 +50,7 @@ namespace Yahtzee.Presentation
             scaler.matchWidthOrHeight = 0.5f;
 
             if (!worldDice)
-                Image(canvasGo.transform, "Background", Vector2.zero, Vector2.one, UiPalette.Background);
+                Fill(canvasGo.transform, "Background", Vector2.zero, Vector2.one, UiPalette.Backdrop);
 
             var safe = Rect(canvasGo.transform, "SafeArea", Vector2.zero, Vector2.one);
             safe.gameObject.AddComponent<SafeAreaFitter>();
@@ -94,7 +94,7 @@ namespace Yahtzee.Presentation
             // safe area and the true top of the screen — otherwise a band of kitchen shows
             // above it, and the bar's own contents (which sit inside the safe area) spill below
             // a backing anchored to the screen. Overflowing one rect solves both ends.
-            var backing = Image(bar, "Backing", Vector2.zero, Vector2.one, UiPalette.BarDeep);
+            var backing = Fill(bar, "Backing", Vector2.zero, Vector2.one, UiPalette.Chrome);
             backing.raycastTarget = false;
             backing.rectTransform.offsetMax = new Vector2(0f, 260f);
             backing.transform.SetAsFirstSibling();
@@ -105,7 +105,7 @@ namespace Yahtzee.Presentation
                 new Vector2(0.03f, 0.40f), new Vector2(0.84f, 1f));
             header.fontStyle = FontStyles.Bold;
 
-            var menuBg = Image(bar, "MenuButton", new Vector2(0.855f, 0.42f), new Vector2(0.985f, 0.98f), UiPalette.BarLight);
+            var menuBg = Image(bar, "MenuButton", new Vector2(0.855f, 0.42f), new Vector2(0.985f, 0.98f), UiPalette.ChromeLight);
             menuButton = menuBg.gameObject.AddComponent<Button>();
             menuButton.targetGraphic = menuBg;
             menuButton.onClick.AddListener(controller.OnMenuTapped);
@@ -115,7 +115,7 @@ namespace Yahtzee.Presentation
             // Second line is the round. The old per-roll chatter ("Roll 2 of 3 done - tap dice to
             // keep...") is gone: the pips already show the rolls, and the taps are on the table.
             // It still yields to anything genuinely important — Joker rules, Oma's turn, toasts.
-            status = Text(bar, "Status", "", 32f, UiPalette.Gold, TextAlignmentOptions.Center,
+            status = Text(bar, "Status", "", 32f, UiPalette.Accent, TextAlignmentOptions.Center,
                 new Vector2(0.03f, 0.02f), new Vector2(0.97f, 0.40f));
 
             // The hamburger opens the full Home screen now; this panel is retired.
@@ -127,11 +127,11 @@ namespace Yahtzee.Presentation
         private static void BuildMenuPanel(GameObject panel, GameController controller)
         {
             var rect = (RectTransform)panel.transform;
-            Image(rect, "Backing", Vector2.zero, Vector2.one, UiPalette.BarDeep);
+            Image(rect, "Backing", Vector2.zero, Vector2.one, UiPalette.Chrome);
 
-            AddMenuRow(rect, "New Game", 0, UiPalette.Gold, UiPalette.Ink, controller.OnNewGameTapped);
-            AddMenuRow(rect, "Settings", 1, UiPalette.BarLight, UiPalette.CreamDim, null);
-            AddMenuRow(rect, "Store", 2, UiPalette.BarLight, UiPalette.CreamDim, null);
+            AddMenuRow(rect, "New Game", 0, UiPalette.Accent, UiPalette.Ink, controller.OnNewGameTapped);
+            AddMenuRow(rect, "Settings", 1, UiPalette.ChromeLight, UiPalette.CreamDim, null);
+            AddMenuRow(rect, "Store", 2, UiPalette.ChromeLight, UiPalette.CreamDim, null);
         }
 
         private static void AddMenuRow(RectTransform parent, string label, int index, Color background,
@@ -192,7 +192,7 @@ namespace Yahtzee.Presentation
 
         private static GameObject BuildSkipOverlay(RectTransform parent, GameController controller)
         {
-            var overlay = Image(parent, "SkipOverlay", Vector2.zero, Vector2.one, Color.clear);
+            var overlay = Fill(parent, "SkipOverlay", Vector2.zero, Vector2.one, Color.clear);
             var button = overlay.gameObject.AddComponent<Button>();
             button.targetGraphic = overlay;
             button.transition = Selectable.Transition.None;
@@ -206,7 +206,7 @@ namespace Yahtzee.Presentation
         private static void BuildRollBar(RectTransform parent, GameController controller,
             out Button rollButton, out TextMeshProUGUI rollLabel, out Image[] pips)
         {
-            var rollBg = Image(parent, "RollButton", new Vector2(0.02f, 0.012f), new Vector2(0.98f, 0.108f), UiPalette.Gold);
+            var rollBg = Image(parent, "RollButton", new Vector2(0.02f, 0.012f), new Vector2(0.98f, 0.108f), UiPalette.Accent);
             rollButton = rollBg.gameObject.AddComponent<Button>();
             rollButton.targetGraphic = rollBg;
             rollButton.onClick.AddListener(controller.OnRollTapped);
@@ -223,7 +223,7 @@ namespace Yahtzee.Presentation
             {
                 float x0 = 0.66f + i * 0.10f;
                 pips[i] = Image(rollBg.rectTransform, $"Pip{i}", new Vector2(x0, 0.28f), new Vector2(x0 + 0.078f, 0.72f),
-                    UiPalette.GoldDark);
+                    UiPalette.Chrome, cornerRadius: 10);
                 pips[i].raycastTarget = false;
                 AddTick(pips[i].rectTransform);
             }
@@ -234,10 +234,10 @@ namespace Yahtzee.Presentation
         private static void AddTick(RectTransform pip)
         {
             var tick = Rect(pip, "Tick", Vector2.zero, Vector2.one);
-            var shortArm = Image(tick, "Short", new Vector2(0.12f, 0.34f), new Vector2(0.52f, 0.52f), UiPalette.Ink);
+            var shortArm = Fill(tick, "Short", new Vector2(0.12f, 0.34f), new Vector2(0.52f, 0.52f), UiPalette.Ink);
             shortArm.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -45f);
             shortArm.raycastTarget = false;
-            var longArm = Image(tick, "Long", new Vector2(0.30f, 0.30f), new Vector2(0.90f, 0.48f), UiPalette.Ink);
+            var longArm = Fill(tick, "Long", new Vector2(0.30f, 0.30f), new Vector2(0.90f, 0.48f), UiPalette.Ink);
             longArm.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 45f);
             longArm.raycastTarget = false;
             tick.gameObject.SetActive(false);
@@ -265,14 +265,14 @@ namespace Yahtzee.Presentation
 
         private static void BuildGameOver(RectTransform parent, GameController controller, out GameObject panel, out TextMeshProUGUI text)
         {
-            var scrim = Image(parent, "GameOver", Vector2.zero, Vector2.one, new Color(0f, 0f, 0f, 0.78f));
+            var scrim = Fill(parent, "GameOver", Vector2.zero, Vector2.one, new Color(0.16f, 0.14f, 0.26f, 0.82f));
             panel = scrim.gameObject;
             var box = Image(scrim.rectTransform, "Box", new Vector2(0.08f, 0.38f), new Vector2(0.92f, 0.62f), UiPalette.Cream).rectTransform;
             text = Text(box, "Text", "", 60f, UiPalette.Ink, TextAlignmentOptions.Center,
                 new Vector2(0f, 0.35f), new Vector2(1f, 1f));
             text.fontStyle = FontStyles.Bold;
 
-            var againBg = Image(box, "PlayAgain", new Vector2(0.22f, 0.06f), new Vector2(0.78f, 0.32f), UiPalette.Gold);
+            var againBg = Image(box, "PlayAgain", new Vector2(0.22f, 0.06f), new Vector2(0.78f, 0.32f), UiPalette.Accent);
             var againButton = againBg.gameObject.AddComponent<Button>();
             againButton.targetGraphic = againBg;
             againButton.onClick.AddListener(controller.OnNewGameTapped);
@@ -281,6 +281,24 @@ namespace Yahtzee.Presentation
         }
 
         // ---- Primitive helpers (shared with ScorecardBuilder) ----------------
+
+        private static TMP_FontAsset _gameFont;
+        private static bool _gameFontLooked;
+
+        /// <summary>The game's typeface, built from Assets/Fonts by the FontTool. Null until one is
+        /// dropped in, in which case TMP's default face is used — a missing font is a downgrade,
+        /// not a break.</summary>
+        private static TMP_FontAsset GameFont
+        {
+            get
+            {
+                if (_gameFontLooked)
+                    return _gameFont;
+                _gameFontLooked = true;
+                _gameFont = Resources.Load<TMP_FontAsset>("Fonts/GameFont");
+                return _gameFont;
+            }
+        }
 
         private static void EnsureEventSystem()
         {
@@ -302,17 +320,33 @@ namespace Yahtzee.Presentation
             return rect;
         }
 
-        internal static Image Image(Transform parent, string name, Vector2 aMin, Vector2 aMax, Color color)
+        /// <summary>A soft-cornered panel. Everything in the UI is rounded — hard rectangles are
+        /// most of what made the old chrome read as a spreadsheet rather than a storybook.</summary>
+        internal static Image Image(Transform parent, string name, Vector2 aMin, Vector2 aMax, Color color,
+            int cornerRadius = 20)
         {
             var image = Rect(parent, name, aMin, aMax).gameObject.AddComponent<Image>();
             image.color = color;
+            if (cornerRadius > 0)
+            {
+                image.sprite = UiSprites.Rounded(cornerRadius);
+                image.type = UnityEngine.UI.Image.Type.Sliced;
+            }
             return image;
         }
+
+        /// <summary>A square-cornered fill, for the few places a rounded edge would be wrong —
+        /// full-bleed backdrops and the bonus progress bar.</summary>
+        internal static Image Fill(Transform parent, string name, Vector2 aMin, Vector2 aMax, Color color) =>
+            Image(parent, name, aMin, aMax, color, cornerRadius: 0);
 
         internal static TextMeshProUGUI Text(Transform parent, string name, string content, float size, Color color,
             TextAlignmentOptions align, Vector2 aMin, Vector2 aMax)
         {
             var text = Rect(parent, name, aMin, aMax).gameObject.AddComponent<TextMeshProUGUI>();
+            var face = GameFont;
+            if (face != null)
+                text.font = face;
             text.text = content;
             text.fontSize = size;
             text.color = color;

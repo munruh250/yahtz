@@ -16,6 +16,7 @@ namespace Yahtzee.EditorTools
         public static void SetupProject()
         {
             ImportTmpEssentialsIfMissing();
+            FontTool.Build();
             BuildGameScene();
             ConfigurePlayerSettings();
             AssetDatabase.SaveAssets();
@@ -47,7 +48,7 @@ namespace Yahtzee.EditorTools
             if (camera != null)
             {
                 camera.clearFlags = CameraClearFlags.SolidColor;
-                camera.backgroundColor = UiPalette.Background;
+                camera.backgroundColor = UiPalette.Backdrop;
             }
 
             EditorSceneManager.MarkSceneDirty(scene);

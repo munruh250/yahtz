@@ -70,14 +70,14 @@ namespace Yahtzee.Presentation
             {
                 _bonusLabel.text = $"Bonus secured  +{Scorecard.UpperBonusScore}";
                 _bonusLabel.color = UiPalette.Ink;
-                _bonusFill.color = UiPalette.Gold;
+                _bonusFill.color = UiPalette.Accent;
                 progress = 1f;
             }
             else
             {
                 _bonusLabel.text = $"Bonus  {upper} / {Scorecard.UpperBonusThreshold}";
                 _bonusLabel.color = UiPalette.Ink;
-                _bonusFill.color = UiPalette.GoldDark;
+                _bonusFill.color = UiPalette.AccentDeep;
                 progress = Mathf.Clamp01(upper / (float)Scorecard.UpperBonusThreshold);
             }
             _bonusFill.rectTransform.anchorMax = new Vector2(progress, 1f);

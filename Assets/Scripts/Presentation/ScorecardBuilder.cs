@@ -77,7 +77,7 @@ namespace Yahtzee.Presentation
             board.transform.localScale = new Vector3(CardWidth + BoardMargin, CardHeight + BoardMargin, BoardThickness);
             board.GetComponent<Renderer>().material = new Material(Shader.Find("Standard"))
             {
-                color = new Color(0.30f, 0.20f, 0.13f),
+                color = new Color(0.38f, 0.33f, 0.48f),
             };
             Object.Destroy(board.GetComponent<Collider>()); // decoration; dice never reach it
         }
@@ -118,8 +118,8 @@ namespace Yahtzee.Presentation
 
             // Bonus row closes the upper column, exactly as the pad does.
             var bonusRow = UiBuilder.Image(panel, "BonusRow",
-                new Vector2(0.012f, RowBottom(6)), new Vector2(0.494f, RowTop(6)), UiPalette.PaperBand).rectTransform;
-            var fill = UiBuilder.Image(bonusRow, "Fill", Vector2.zero, new Vector2(0f, 1f), UiPalette.Gold);
+                new Vector2(0.012f, RowBottom(6)), new Vector2(0.494f, RowTop(6)), UiPalette.PaperBand, cornerRadius: 0).rectTransform;
+            var fill = UiBuilder.Fill(bonusRow, "Fill", Vector2.zero, new Vector2(0f, 1f), UiPalette.Accent);
             var bonusLabel = UiBuilder.Text(bonusRow, "Label", "", 27f, UiPalette.InkDark, TextAlignmentOptions.Center,
                 Vector2.zero, Vector2.one);
             bonusLabel.fontStyle = FontStyles.Bold;
@@ -151,7 +151,7 @@ namespace Yahtzee.Presentation
         private static void AddSectionBand(RectTransform parent, string label, float xMin, float xMax)
         {
             var band = UiBuilder.Image(parent, label, new Vector2(xMin, 1f - BandUnits / TotalUnits),
-                new Vector2(xMax, 1f), UiPalette.PaperBand);
+                new Vector2(xMax, 1f), UiPalette.PaperBand, cornerRadius: 0);
             band.raycastTarget = false;
             UiBuilder.Text(band.rectTransform, "Label", label, 22f, UiPalette.InkDark, TextAlignmentOptions.Center,
                 Vector2.zero, Vector2.one).fontStyle = FontStyles.Bold;
@@ -161,12 +161,12 @@ namespace Yahtzee.Presentation
             float xMin, float xMax, int row, string hint)
         {
             var bg = UiBuilder.Image(parent, UiBuilder.DisplayName(category),
-                new Vector2(xMin, RowBottom(row)), new Vector2(xMax, RowTop(row)), UiPalette.Paper);
+                new Vector2(xMin, RowBottom(row)), new Vector2(xMax, RowTop(row)), UiPalette.Paper, cornerRadius: 0);
             var button = bg.gameObject.AddComponent<Button>();
             button.targetGraphic = bg;
 
             // Hairline rule under each row instead of gaps between floating tiles.
-            var rule = UiBuilder.Image(bg.rectTransform, "Rule", Vector2.zero, new Vector2(1f, 0f), UiPalette.PaperRule);
+            var rule = UiBuilder.Fill(bg.rectTransform, "Rule", Vector2.zero, new Vector2(1f, 0f), UiPalette.PaperRule);
             rule.rectTransform.offsetMax = new Vector2(0f, 2f);
             rule.raycastTarget = false;
 

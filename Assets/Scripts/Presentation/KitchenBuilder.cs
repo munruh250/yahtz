@@ -78,7 +78,7 @@ namespace Yahtzee.Presentation
             cup.transform.SetParent(root, false);
             cup.transform.localPosition = new Vector3(0.46f, TableY + 0.075f, 0.30f);
             cup.transform.localScale = new Vector3(0.14f, 0.075f, 0.14f);
-            cup.GetComponent<Renderer>().material = Mat(new Color(0.12f, 0.11f, 0.11f));
+            cup.GetComponent<Renderer>().material = Mat(new Color(0.31f, 0.28f, 0.42f));
             RemoveCollider(cup); // sits outside the fence at x=0.46; dice can never reach it
 
             var box = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -87,7 +87,7 @@ namespace Yahtzee.Presentation
             box.transform.localPosition = new Vector3(-0.66f, TableY + 0.05f, 0.32f);
             box.transform.localRotation = Quaternion.Euler(0f, 24f, 0f);
             box.transform.localScale = new Vector3(0.34f, 0.10f, 0.24f);
-            box.GetComponent<Renderer>().material = Mat(new Color(0.55f, 0.14f, 0.12f));
+            box.GetComponent<Renderer>().material = Mat(new Color(0.83f, 0.50f, 0.52f));
             RemoveCollider(box); // outside the fence, decoration
 
             // Oma's mug carries a "?" and IS the Ask Oma button — asking her advice should mean
@@ -159,7 +159,7 @@ namespace Yahtzee.Presentation
             pencil.transform.localPosition = position;
             pencil.transform.localRotation = Quaternion.Euler(90f, yaw, 0f);
             pencil.transform.localScale = new Vector3(0.012f, 0.07f, 0.012f);
-            pencil.GetComponent<Renderer>().material = Mat(new Color(0.85f, 0.65f, 0.15f));
+            pencil.GetComponent<Renderer>().material = Mat(new Color(0.90f, 0.76f, 0.45f));
             RemoveCollider(pencil);
         }
 
@@ -178,7 +178,7 @@ namespace Yahtzee.Presentation
             wall.transform.SetParent(root, false);
             wall.transform.localPosition = new Vector3(0f, 0.70f, wallZ);
             wall.transform.localScale = new Vector3(5.2f, 3.4f, 0.10f);
-            wall.GetComponent<Renderer>().material = Mat(new Color(0.50f, 0.44f, 0.36f));
+            wall.GetComponent<Renderer>().material = Mat(new Color(0.57f, 0.54f, 0.65f));
             RemoveCollider(wall);
 
             // Window: a dark frame with a pale, softly lit pane. Frosted, so it needs no scenery
@@ -188,7 +188,7 @@ namespace Yahtzee.Presentation
             frame.transform.SetParent(root, false);
             frame.transform.localPosition = new Vector3(-0.52f, 0.52f, wallZ - 0.06f);
             frame.transform.localScale = new Vector3(0.58f, 0.72f, 0.05f);
-            frame.GetComponent<Renderer>().material = Mat(new Color(0.20f, 0.15f, 0.11f));
+            frame.GetComponent<Renderer>().material = Mat(new Color(0.33f, 0.29f, 0.42f));
             RemoveCollider(frame);
 
             var pane = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -196,7 +196,7 @@ namespace Yahtzee.Presentation
             pane.transform.SetParent(root, false);
             pane.transform.localPosition = new Vector3(-0.52f, 0.52f, wallZ - 0.09f);
             pane.transform.localScale = new Vector3(0.48f, 0.62f, 0.02f);
-            pane.GetComponent<Renderer>().material = Mat(new Color(0.78f, 0.83f, 0.84f));
+            pane.GetComponent<Renderer>().material = Mat(new Color(0.85f, 0.88f, 0.95f));
             RemoveCollider(pane);
 
             // Glazing bars, so it reads as a window rather than a lit rectangle.
@@ -214,7 +214,7 @@ namespace Yahtzee.Presentation
             bar.transform.SetParent(root, false);
             bar.transform.localPosition = position;
             bar.transform.localScale = scale;
-            bar.GetComponent<Renderer>().material = Mat(new Color(0.20f, 0.15f, 0.11f));
+            bar.GetComponent<Renderer>().material = Mat(new Color(0.33f, 0.29f, 0.42f));
             RemoveCollider(bar);
         }
 
@@ -230,7 +230,7 @@ namespace Yahtzee.Presentation
             frame.transform.SetParent(root, false);
             frame.transform.localPosition = position;
             frame.transform.localScale = new Vector3(width, height, 0.04f);
-            frame.GetComponent<Renderer>().material = Mat(new Color(0.26f, 0.16f, 0.09f));
+            frame.GetComponent<Renderer>().material = Mat(new Color(0.36f, 0.30f, 0.44f));
             RemoveCollider(frame);
 
             var mat = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -238,7 +238,7 @@ namespace Yahtzee.Presentation
             mat.transform.SetParent(root, false);
             mat.transform.localPosition = position + new Vector3(0f, 0f, -0.02f);
             mat.transform.localScale = new Vector3(width * 0.88f, height * 0.84f, 0.02f);
-            mat.GetComponent<Renderer>().material = Mat(new Color(0.90f, 0.86f, 0.75f));
+            mat.GetComponent<Renderer>().material = Mat(new Color(0.97f, 0.94f, 0.88f));
             RemoveCollider(mat);
 
             var canvasGo = new GameObject("SamplerText", typeof(Canvas));
@@ -253,7 +253,7 @@ namespace Yahtzee.Presentation
             // player sits at -Z. Turning it to "face" them mirrors the text.
             rect.localPosition = position + new Vector3(0f, 0f, -0.04f);
 
-            var label = UiBuilder.Text(rect, "Text", text, 56f, new Color(0.34f, 0.22f, 0.14f),
+            var label = UiBuilder.Text(rect, "Text", text, 56f, new Color(0.38f, 0.33f, 0.50f),
                 TMPro.TextAlignmentOptions.Center, Vector2.zero, Vector2.one);
             label.enableWordWrapping = true;
         }
@@ -276,7 +276,7 @@ namespace Yahtzee.Presentation
 
             // Placeholder look: the Mixamo body ships untextured; a soft cardigan-purple
             // tint keeps her reading as "Oma" until the real low-poly model lands in M5.
-            var cardigan = Mat(new Color(0.52f, 0.40f, 0.58f));
+            var cardigan = Mat(new Color(0.66f, 0.60f, 0.78f));
             foreach (var renderer in oma.GetComponentsInChildren<Renderer>())
                 renderer.material = cardigan;
 
@@ -301,7 +301,7 @@ namespace Yahtzee.Presentation
             // scorecard in front of the dice fence. Oma's far edge is unchanged.
             table.transform.localPosition = new Vector3(0f, TableY - 0.05f, 0f);
             table.transform.localScale = new Vector3(1.7f, 0.1f, 1.7f);
-            table.GetComponent<Renderer>().material = Mat(new Color(0.42f, 0.28f, 0.16f)); // warm wood
+            table.GetComponent<Renderer>().material = Mat(new Color(0.50f, 0.40f, 0.35f)); // warm wood, muted to sit under the soft palette
             table.GetComponent<BoxCollider>().material = DiePhysicMaterial();
 
         }
@@ -406,7 +406,7 @@ namespace Yahtzee.Presentation
             // Wide enough to read past the die's corners (its half-diagonal is ~0.064).
             marker.transform.localPosition = new Vector3(slot.x, TableY + 0.002f, slot.z);
             marker.transform.localScale = new Vector3(0.17f, 0.002f, 0.17f);
-            marker.GetComponent<Renderer>().material = Mat(UiPalette.Gold);
+            marker.GetComponent<Renderer>().material = Mat(UiPalette.Accent);
             Object.Destroy(marker.GetComponent<Collider>()); // never blocks a die tap
             marker.SetActive(false);
             return marker.transform;

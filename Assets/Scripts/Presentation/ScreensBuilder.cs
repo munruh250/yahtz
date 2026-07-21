@@ -37,15 +37,20 @@ namespace Yahtzee.Presentation
         {
             var panel = Backdrop(parent, "TitleScreen");
 
-            var title = UiBuilder.Text(panel, "Title", "Dice with Oma", 96f, UiPalette.Gold,
-                TextAlignmentOptions.Center, new Vector2(0.05f, 0.60f), new Vector2(0.95f, 0.76f));
+            var banner = UiBuilder.Image(panel, "Banner", new Vector2(0.06f, 0.60f), new Vector2(0.94f, 0.74f),
+                UiPalette.Accent, cornerRadius: 34);
+            var title = UiBuilder.Text(banner.rectTransform, "Title", "Dice with Oma", 84f, UiPalette.Cream,
+                TextAlignmentOptions.Center, new Vector2(0f, 0.06f), new Vector2(1f, 1f));
             title.fontStyle = FontStyles.Bold;
-            UiBuilder.Text(panel, "Subtitle", "an evening at Oma's kitchen table", 34f, UiPalette.CreamDim,
-                TextAlignmentOptions.Center, new Vector2(0.05f, 0.54f), new Vector2(0.95f, 0.60f));
-            UiBuilder.Text(panel, "Prompt", "tap to begin", 38f, UiPalette.Cream,
-                TextAlignmentOptions.Center, new Vector2(0.05f, 0.30f), new Vector2(0.95f, 0.38f));
+            UiBuilder.Text(banner.rectTransform, "Subtitle", "an evening at Oma's kitchen table", 28f, UiPalette.Ink,
+                TextAlignmentOptions.Center, new Vector2(0.04f, 0f), new Vector2(0.96f, 0.24f));
 
-            // The whole screen is the button — nothing to aim at.
+            var prompt = UiBuilder.Image(panel, "Prompt", new Vector2(0.28f, 0.34f), new Vector2(0.72f, 0.43f),
+                UiPalette.Paper, cornerRadius: 26);
+            UiBuilder.Text(prompt.rectTransform, "Label", "tap to begin", 36f, UiPalette.Ink,
+                TextAlignmentOptions.Center, Vector2.zero, Vector2.one).fontStyle = FontStyles.Bold;
+
+            // The whole screen is the button - nothing to aim at.
             var hit = panel.gameObject.AddComponent<Button>();
             hit.targetGraphic = panel.GetComponent<Image>();
             hit.transition = Selectable.Transition.None;
@@ -56,93 +61,95 @@ namespace Yahtzee.Presentation
         private static GameObject BuildHome(RectTransform parent, ScreensView view, GameController controller,
             List<System.Action> refreshers)
         {
-            var panel = Backdrop(parent, "HomeScreen");
-            Heading(panel, "Dice with Oma");
+            var backdrop = Backdrop(parent, "HomeScreen");
+            var card = Card(backdrop, "DICE WITH OMA");
 
-            var resume = MenuButton(panel, "Resume", 0, UiPalette.GoldSoft, () => view.Close());
-            MenuButton(panel, "New Game", 1, UiPalette.Gold, () =>
+            var resume = MenuButton(card, "Resume", 0, UiPalette.AccentSoft, () => view.Close());
+            MenuButton(card, "New Game", 1, UiPalette.Accent, () =>
             {
                 view.Close();
                 controller.OnNewGameTapped();
             });
-            MenuButton(panel, "Settings", 2, UiPalette.BarLight, () => view.Show(ScreensView.Screen.Settings));
-            MenuButton(panel, "Store", 3, UiPalette.BarLight, () => view.Show(ScreensView.Screen.Store));
+            MenuButton(card, "Settings", 2, UiPalette.ChromeLight, () => view.Show(ScreensView.Screen.Settings));
+            MenuButton(card, "Store", 3, UiPalette.ChromeLight, () => view.Show(ScreensView.Screen.Store));
 
             // Nothing to resume before the first game starts.
             refreshers.Add(() => resume.gameObject.SetActive(controller.Engine != null));
-            return panel.gameObject;
+            return backdrop.gameObject;
         }
 
         private static GameObject BuildSettings(RectTransform parent, ScreensView view, GameController controller,
             List<System.Action> refreshers)
         {
-            var panel = Backdrop(parent, "SettingsScreen");
-            Heading(panel, "Settings");
+            var backdrop = Backdrop(parent, "SettingsScreen");
+            var card = Card(backdrop, "SETTINGS");
 
-            UiBuilder.Text(panel, "DifficultyLabel", "How sharp is Oma?", 34f, UiPalette.CreamDim,
-                TextAlignmentOptions.Center, new Vector2(0.08f, 0.70f), new Vector2(0.92f, 0.75f));
+            SectionLabel(card, "How sharp is Oma?", 0.90f);
             var difficulties = new[] { GameSettings.Difficulty.Gentle, GameSettings.Difficulty.Normal, GameSettings.Difficulty.Sharp };
             var difficultyButtons = new Image[difficulties.Length];
             for (int i = 0; i < difficulties.Length; i++)
             {
                 var choice = difficulties[i];
-                difficultyButtons[i] = Chip(panel, choice.ToString(), i, difficulties.Length, 0.62f,
+                difficultyButtons[i] = Chip(card, choice.ToString(), i, difficulties.Length, 0.80f,
                     () => GameSettings.SelectedDifficulty = choice);
             }
 
-            UiBuilder.Text(panel, "DiceLabel", "Your dice", 34f, UiPalette.CreamDim,
-                TextAlignmentOptions.Center, new Vector2(0.08f, 0.50f), new Vector2(0.92f, 0.55f));
+            SectionLabel(card, "Your dice", 0.62f);
             var diceButtons = new Image[DiceSkins.All.Length];
             for (int i = 0; i < DiceSkins.All.Length; i++)
             {
                 var skin = DiceSkins.All[i];
-                diceButtons[i] = Chip(panel, skin.DisplayName, i, DiceSkins.All.Length, 0.42f,
+                diceButtons[i] = Chip(card, skin.DisplayName, i, DiceSkins.All.Length, 0.52f,
                     () => { if (GameSettings.Owns(skin.Id)) GameSettings.SelectedDice = skin.Id; });
             }
 
-            MenuButton(panel, "Back", 3, UiPalette.BarLight, () => view.Show(ScreensView.Screen.Home));
+            MenuButton(card, "Back", 3, UiPalette.ChromeLight, () => view.Show(ScreensView.Screen.Home));
 
             refreshers.Add(() =>
             {
                 for (int i = 0; i < difficulties.Length; i++)
                     difficultyButtons[i].color = difficulties[i] == GameSettings.SelectedDifficulty
-                        ? UiPalette.Gold : UiPalette.BarLight;
+                        ? UiPalette.Accent : UiPalette.PaperShade;
                 for (int i = 0; i < DiceSkins.All.Length; i++)
                 {
                     var skin = DiceSkins.All[i];
-                    diceButtons[i].color = !GameSettings.Owns(skin.Id) ? UiPalette.Panel
-                        : skin.Id == GameSettings.SelectedDice ? UiPalette.Gold : UiPalette.BarLight;
+                    diceButtons[i].color = !GameSettings.Owns(skin.Id) ? UiPalette.PaperRule
+                        : skin.Id == GameSettings.SelectedDice ? UiPalette.Accent : UiPalette.PaperShade;
                 }
             });
-            return panel.gameObject;
+            return backdrop.gameObject;
         }
 
         private static GameObject BuildStore(RectTransform parent, ScreensView view, GameController controller,
             List<System.Action> refreshers)
         {
-            var panel = Backdrop(parent, "StoreScreen");
-            Heading(panel, "Store");
-            UiBuilder.Text(panel, "Note", "Free while the shelves are still being stocked.", 30f, UiPalette.CreamDim,
-                TextAlignmentOptions.Center, new Vector2(0.08f, 0.70f), new Vector2(0.92f, 0.75f));
+            var backdrop = Backdrop(parent, "StoreScreen");
+            var card = Card(backdrop, "STORE");
+            SectionLabel(card, "Dice", 0.90f);
 
-            var rows = new List<(DiceSkins.Skin skin, Image swatch, TextMeshProUGUI label, Image button, TextMeshProUGUI buttonLabel)>();
+            var rows = new List<(DiceSkins.Skin skin, Image button, TextMeshProUGUI buttonLabel)>();
             for (int i = 0; i < DiceSkins.All.Length; i++)
             {
                 var skin = DiceSkins.All[i];
-                float top = 0.66f - i * 0.13f;
-                var row = UiBuilder.Image(panel, $"Row{i}", new Vector2(0.08f, top - 0.11f), new Vector2(0.92f, top), UiPalette.BarLight);
+                float top = 0.80f - i * 0.155f;
+                var row = UiBuilder.Image(card, "Row" + i, new Vector2(0.05f, top - 0.135f), new Vector2(0.95f, top),
+                    UiPalette.PaperShade, cornerRadius: 26);
 
-                // A swatch in the actual die colours, so the shelf shows what you are getting.
-                var swatch = UiBuilder.Image(row.rectTransform, "Swatch", new Vector2(0.03f, 0.15f), new Vector2(0.18f, 0.85f), skin.Face);
-                UiBuilder.Image(swatch.rectTransform, "Pip", new Vector2(0.32f, 0.32f), new Vector2(0.68f, 0.68f), skin.Pip);
+                // A tile in the actual die colours, so the shelf shows what you are getting.
+                var tile = UiBuilder.Image(row.rectTransform, "Swatch", new Vector2(0.04f, 0.14f),
+                    new Vector2(0.24f, 0.86f), skin.Face, cornerRadius: 18);
+                UiBuilder.Image(tile.rectTransform, "Pip", new Vector2(0.34f, 0.34f), new Vector2(0.66f, 0.66f),
+                    skin.Pip, cornerRadius: 12);
 
-                var label = UiBuilder.Text(row.rectTransform, "Name", skin.DisplayName, 34f, UiPalette.Cream,
-                    TextAlignmentOptions.MidlineLeft, new Vector2(0.23f, 0f), new Vector2(0.62f, 1f));
+                UiBuilder.Text(row.rectTransform, "Name", skin.DisplayName, 36f, UiPalette.Ink,
+                    TextAlignmentOptions.MidlineLeft, new Vector2(0.30f, 0f), new Vector2(0.62f, 1f))
+                    .fontStyle = FontStyles.Bold;
 
-                var buyBg = UiBuilder.Image(row.rectTransform, "Action", new Vector2(0.64f, 0.18f), new Vector2(0.96f, 0.82f), UiPalette.Gold);
+                var buyBg = UiBuilder.Image(row.rectTransform, "Action", new Vector2(0.64f, 0.20f),
+                    new Vector2(0.95f, 0.80f), UiPalette.Accent, cornerRadius: 20);
                 var buy = buyBg.gameObject.AddComponent<Button>();
                 buy.targetGraphic = buyBg;
-                var buyLabel = UiBuilder.Text(buyBg.rectTransform, "Label", "Get", 30f, UiPalette.Ink,
+                var buyLabel = UiBuilder.Text(buyBg.rectTransform, "Label", "Get", 32f, UiPalette.Cream,
                     TextAlignmentOptions.Center, Vector2.zero, Vector2.one);
                 buyLabel.fontStyle = FontStyles.Bold;
 
@@ -154,10 +161,10 @@ namespace Yahtzee.Presentation
                     GameSettings.SelectedDice = captured.Id;
                     view.Show(ScreensView.Screen.Store); // refresh the shelf in place
                 });
-                rows.Add((skin, swatch, label, buyBg, buyLabel));
+                rows.Add((skin, buyBg, buyLabel));
             }
 
-            MenuButton(panel, "Back", 3, UiPalette.BarLight, () => view.Show(ScreensView.Screen.Home));
+            MenuButton(card, "Back", 3, UiPalette.ChromeLight, () => view.Show(ScreensView.Screen.Home));
 
             refreshers.Add(() =>
             {
@@ -166,38 +173,55 @@ namespace Yahtzee.Presentation
                     bool owned = GameSettings.Owns(row.skin.Id);
                     bool selected = row.skin.Id == GameSettings.SelectedDice;
                     row.buttonLabel.text = selected ? "In play" : owned ? "Use" : "Get";
-                    row.button.color = selected ? UiPalette.GoldSoft : UiPalette.Gold;
+                    row.buttonLabel.color = selected ? UiPalette.Ink : UiPalette.Cream;
+                    row.button.color = selected ? UiPalette.AccentSoft : UiPalette.Accent;
                 }
             });
-            return panel.gameObject;
+            return backdrop.gameObject;
         }
 
         // ---- Primitives ------------------------------------------------------
 
         /// <summary>Full-screen and opaque: while a screen is open nothing behind it is tappable.</summary>
-        private static RectTransform Backdrop(RectTransform parent, string name)
+        private static RectTransform Backdrop(RectTransform parent, string name) =>
+            UiBuilder.Fill(parent, name, Vector2.zero, Vector2.one, UiPalette.Backdrop).rectTransform;
+
+        /// <summary>A cream card holding the screen's contents, with a banner sitting across its
+        /// top edge — the layout the owner's reference uses, and it stops every screen reading as
+        /// a list of buttons floating in the dark.</summary>
+        private static RectTransform Card(RectTransform parent, string title, float bottom = 0.16f)
         {
-            var image = UiBuilder.Image(parent, name, Vector2.zero, Vector2.one, UiPalette.Background);
-            return image.rectTransform;
+            var card = UiBuilder.Image(parent, "Card", new Vector2(0.06f, bottom), new Vector2(0.94f, 0.86f),
+                UiPalette.Paper, cornerRadius: 34);
+
+            var banner = UiBuilder.Image(parent, "Banner", new Vector2(0.12f, 0.845f), new Vector2(0.88f, 0.925f),
+                UiPalette.Accent, cornerRadius: 26);
+            var label = UiBuilder.Text(banner.rectTransform, "Title", title, 52f, UiPalette.Cream,
+                TextAlignmentOptions.Center, Vector2.zero, Vector2.one);
+            label.fontStyle = FontStyles.Bold;
+            return card.rectTransform;
         }
 
-        private static void Heading(RectTransform parent, string text)
+        /// <summary>A section strip inside a card, like the reference's "1. BASIC" ribbon.</summary>
+        private static void SectionLabel(RectTransform card, string text, float top)
         {
-            var heading = UiBuilder.Text(parent, "Heading", text, 64f, UiPalette.Gold,
-                TextAlignmentOptions.Center, new Vector2(0.05f, 0.80f), new Vector2(0.95f, 0.90f));
-            heading.fontStyle = FontStyles.Bold;
+            var strip = UiBuilder.Image(card, text, new Vector2(0.05f, top - 0.052f), new Vector2(0.62f, top),
+                UiPalette.PaperBand, cornerRadius: 16);
+            UiBuilder.Text(strip.rectTransform, "Label", text, 30f, UiPalette.Ink,
+                TextAlignmentOptions.Center, Vector2.zero, Vector2.one).fontStyle = FontStyles.Bold;
         }
 
         private static Image MenuButton(RectTransform parent, string label, int index, Color colour,
             UnityEngine.Events.UnityAction onClick)
         {
-            float top = 0.34f - index * 0.075f;
-            var bg = UiBuilder.Image(parent, label, new Vector2(0.18f, top - 0.06f), new Vector2(0.82f, top), colour);
+            float top = 0.70f - index * 0.145f;
+            var bg = UiBuilder.Image(parent, label, new Vector2(0.10f, top - 0.115f), new Vector2(0.90f, top),
+                colour, cornerRadius: 26);
             var button = bg.gameObject.AddComponent<Button>();
             button.targetGraphic = bg;
             button.onClick.AddListener(onClick);
-            var text = UiBuilder.Text(bg.rectTransform, "Label", label, 38f,
-                colour == UiPalette.BarLight ? UiPalette.Cream : UiPalette.Ink,
+            var text = UiBuilder.Text(bg.rectTransform, "Label", label, 40f,
+                colour == UiPalette.ChromeLight ? UiPalette.Cream : UiPalette.Ink,
                 TextAlignmentOptions.Center, Vector2.zero, Vector2.one);
             text.fontStyle = FontStyles.Bold;
             return bg;
@@ -206,14 +230,14 @@ namespace Yahtzee.Presentation
         private static Image Chip(RectTransform parent, string label, int index, int count, float top,
             UnityEngine.Events.UnityAction onClick)
         {
-            float width = 0.84f / count;
-            float x0 = 0.08f + index * width;
-            var bg = UiBuilder.Image(parent, label, new Vector2(x0 + 0.01f, top - 0.06f),
-                new Vector2(x0 + width - 0.01f, top), UiPalette.BarLight);
+            float width = 0.90f / count;
+            float x0 = 0.05f + index * width;
+            var bg = UiBuilder.Image(parent, label, new Vector2(x0 + 0.012f, top - 0.085f),
+                new Vector2(x0 + width - 0.012f, top), UiPalette.PaperShade, cornerRadius: 22);
             var button = bg.gameObject.AddComponent<Button>();
             button.targetGraphic = bg;
             button.onClick.AddListener(onClick);
-            UiBuilder.Text(bg.rectTransform, "Label", label, 30f, UiPalette.Cream,
+            UiBuilder.Text(bg.rectTransform, "Label", label, 32f, UiPalette.Ink,
                 TextAlignmentOptions.Center, Vector2.zero, Vector2.one).fontStyle = FontStyles.Bold;
             return bg;
         }

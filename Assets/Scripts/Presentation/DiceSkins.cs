@@ -26,7 +26,7 @@ namespace Yahtzee.Presentation
         public static readonly Skin[] All =
         {
             new Skin(GameSettings.ClassicDice, "Classic", UiPalette.DieFace, UiPalette.DiePip),
-            new Skin(GameSettings.RubyDice, "Ruby", new Color(0.70f, 0.11f, 0.13f), new Color(0.98f, 0.97f, 0.95f)),
+            new Skin(GameSettings.RubyDice, "Ruby", new Color(0.82f, 0.40f, 0.44f), new Color(0.99f, 0.97f, 0.96f)),
         };
 
         public static Skin Selected => Find(GameSettings.SelectedDice);

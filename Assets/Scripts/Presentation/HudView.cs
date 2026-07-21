@@ -50,7 +50,9 @@ namespace Yahtzee.Presentation
             for (int i = 0; i < _rollPips.Length; i++)
             {
                 bool used = i < rollsUsed;
-                _rollPips[i].color = used ? UiPalette.GoldSoft : UiPalette.GoldDark;
+                // Cream when ticked, deep chrome when still to come: periwinkle-on-periwinkle
+                // was nearly invisible against the button itself.
+                _rollPips[i].color = used ? UiPalette.Paper : UiPalette.Chrome;
                 _rollPips[i].transform.GetChild(0).gameObject.SetActive(used);
             }
         }

@@ -2,34 +2,57 @@ using UnityEngine;
 
 namespace Yahtzee.Presentation
 {
-    /// <summary>Prototype palette — warm, cozy, kitchen-table (design spec §1). The 2D layer
-    /// is scaffolding for M2/M3, so colors live in code, not assets.</summary>
+    /// <summary>The game's colours. Cozy and cartoony rather than heavy: soft periwinkle blues and
+    /// lilacs against warm cream paper, with ink a deep indigo instead of black. Nothing here is
+    /// fully saturated and nothing is pure white or black — that softness is what reads as
+    /// storybook rather than spreadsheet.
+    ///
+    /// Named by role, not by hue, so a re-tint never leaves a field called `Gold` holding a blue.</summary>
     public static class UiPalette
     {
-        public static readonly Color Background = Hex("2B1E16");
-        public static readonly Color Panel = Hex("3A2A1E");
-        public static readonly Color Cream = Hex("F3E7C9");
-        public static readonly Color CreamDim = Hex("C9BFA8");
-        public static readonly Color Ink = Hex("3B2C1A");
-        public static readonly Color InkGhost = Hex("9C8F73");
-        public static readonly Color Gold = Hex("E4B54A");
-        public static readonly Color GoldSoft = Hex("EDD9A8");
-        public static readonly Color GoldDark = Hex("B8892E");
-        public static readonly Color DieFace = Hex("FAF6EA");
-        public static readonly Color DiePip = Hex("33261A");
-        public static readonly Color KeptOutline = Hex("E4B54A");
+        // ---- Surfaces --------------------------------------------------------
 
-        // Top bar / menu chrome.
-        public static readonly Color BarDeep = Hex("2A1D14");
-        public static readonly Color BarLight = Hex("4A3728");
+        /// <summary>Behind the front-end screens: deep, soft indigo — night outside the kitchen.</summary>
+        public static readonly Color Backdrop = Hex("2A2742");
 
-        // Paper scorecard (design reference: the real Yahtzee pad — white stock, black ink,
-        // grey section bands).
-        public static readonly Color Paper = Hex("F7F5EE");
-        public static readonly Color PaperShade = Hex("DAD6CA");
-        public static readonly Color PaperRule = Hex("9A948A");
-        public static readonly Color PaperBand = Hex("BFBAAE");
-        public static readonly Color InkDark = Hex("1E1A15");
+        /// <summary>Chrome: top bar, menu rows, inactive chips.</summary>
+        public static readonly Color Chrome = Hex("4E4A7C");
+        public static readonly Color ChromeLight = Hex("6E69A4");
+
+        /// <summary>Warm cream paper — the scorecard, speech bubbles, tiles.</summary>
+        public static readonly Color Paper = Hex("FCF5E6");
+        /// <summary>A filled or unavailable box: paper cooled toward lilac.</summary>
+        public static readonly Color PaperShade = Hex("E6DEF3");
+        public static readonly Color PaperRule = Hex("BAB2D6");
+        /// <summary>Section bands on the scorecard.</summary>
+        public static readonly Color PaperBand = Hex("D7CFEC");
+
+        // ---- Type ------------------------------------------------------------
+
+        /// <summary>Light type on chrome.</summary>
+        public static readonly Color Cream = Hex("FBF5E9");
+        public static readonly Color CreamDim = Hex("CFC7E6");
+        /// <summary>Dark type on paper. Deep indigo, never black.</summary>
+        public static readonly Color Ink = Hex("3C3768");
+        public static readonly Color InkDark = Hex("2B2751");
+        /// <summary>Ghosted potential scores.</summary>
+        public static readonly Color InkGhost = Hex("A69ECA");
+
+        // ---- Accent ----------------------------------------------------------
+
+        /// <summary>Primary action and current selection: soft periwinkle.</summary>
+        public static readonly Color Accent = Hex("93ABEA");
+        /// <summary>Suggestions and secondary highlights.</summary>
+        public static readonly Color AccentSoft = Hex("C6D4F7");
+        /// <summary>Deeper periwinkle: unfilled roll boxes, pressed states.</summary>
+        public static readonly Color AccentDeep = Hex("6E80C6");
+
+        // ---- Dice ------------------------------------------------------------
+
+        public static readonly Color DieFace = Hex("FCF7EE");
+        public static readonly Color DiePip = Hex("4A4478");
+        /// <summary>The pad a kept die sits on.</summary>
+        public static readonly Color KeptOutline = Hex("93ABEA");
 
         private static Color Hex(string rgb)
         {
