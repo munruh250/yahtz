@@ -14,6 +14,10 @@ namespace Yahtzee.Presentation
         private const float SettleLinearSpeed = 0.30f;
         private const float SettleAngularSpeed = 2.0f;
         private const float CorrectionSeconds = 0.25f;
+        /// <summary>How long a die must stay slow before we call it settled even though it is
+        /// above table height — i.e. it has come to rest on top of another die. Long enough that
+        /// the momentary stillness at the apex of a bounce doesn't count.</summary>
+        private const float RestingHighSeconds = 0.30f;
 
         /// <summary>Local direction that points up when the face shows: 1=+Y 6=-Y 2=+Z 5=-Z
         /// 3=+X 4=-X (opposite faces sum to 7, like a real die).</summary>
@@ -37,6 +41,7 @@ namespace Yahtzee.Presentation
         private float _correctT;
         private Quaternion _correctFrom, _correctTo;
         private float _restY;
+        private float _slowSeconds;
 
         public int Index { get; private set; }
         public bool Settled => _phase == Phase.Settled || _phase == Phase.Idle;
@@ -89,7 +94,15 @@ namespace Yahtzee.Presentation
             _rb.velocity = velocity;
             _rb.angularVelocity = angularVelocity;
             _rollStartTime = Time.time;
+            _slowSeconds = 0f;
             _phase = Phase.Tumbling;
+        }
+
+        /// <summary>Slide a settled die across the table, keeping its resting face and yaw. Used
+        /// to unstack dice that came to rest on top of each other.</summary>
+        public void SlideTo(float x, float z)
+        {
+            transform.position = new Vector3(x, _restY, z);
         }
 
         /// <summary>Skip: freeze in place with the correct face up immediately.</summary>
@@ -115,9 +128,15 @@ namespace Yahtzee.Presentation
                         SnapNow(); // cocked against something / never calmed down
                         return;
                     }
-                    if (_rb.velocity.magnitude < SettleLinearSpeed
-                        && _rb.angularVelocity.magnitude < SettleAngularSpeed
-                        && transform.position.y < _restY + 0.05f)
+                    bool slow = _rb.velocity.magnitude < SettleLinearSpeed
+                                && _rb.angularVelocity.magnitude < SettleAngularSpeed;
+                    _slowSeconds = slow ? _slowSeconds + Time.fixedDeltaTime : 0f;
+
+                    // Normally we wait until the die is down on the table. A die that comes to
+                    // rest ON another die never gets there, so it used to sit stacked until the
+                    // 2.5 s watchdog dropped it — straight into the die beneath it. Treat
+                    // sustained stillness as settled too; DiceView3D then unstacks them.
+                    if ((slow && transform.position.y < _restY + 0.05f) || _slowSeconds >= RestingHighSeconds)
                         BeginCorrection();
                     break;
 

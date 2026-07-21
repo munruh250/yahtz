@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-07-20
 **Status:** M1–M3 complete, **M4 ~75%**. The game is fully playable end-to-end in the 3D kitchen scene vs. an auto-playing Oma, and the scorecard is now a physical object on the table.
-**Test baseline (must stay green):** EditMode **94**, PlayMode **15**. Run them with `Tools\run-tests.ps1` — no need to close the editor.
+**Test baseline (must stay green):** EditMode **101**, PlayMode **19**. Run them with `Tools\run-tests.ps1` — no need to close the editor.
 **Next task:** M4 finish — see [What's left](#whats-left), item 1 (cup pour).
 
 ---
@@ -67,6 +67,8 @@ Tools\run-tests.ps1 -Filter Yahtzee.Tests.DiceTapTests  # one fixture
 
 It mirrors `Assets`/`Packages`/`ProjectSettings` to **`C:\yz-test`** and runs there, printing the pass/fail tally, any failure messages and each test's own output. `Library` is not mirrored (it regenerates; copying a live one risks a torn state), so the first run after a wipe is slow and later ones are normal speed. Framing PNGs land under the testbed's persistent data path.
 
+**Mirror direction is one-way**, so anything Unity *generates* stays in the testbed. In practice that means new scripts get their `.meta` files written at `C:\yz-test\...`, not in the repo — copy them back before committing, or the next person to open the editor gets fresh GUIDs for files that were already tested.
+
 ### Headless commands (direct — needs the editor closed)
 
 ```powershell
@@ -104,7 +106,8 @@ Results XML parses with `[xml]$r = Get-Content out.xml; $r."test-run"` → `tota
 | `Game/GameState.cs` | The save file: both cards, round, turn, phase, dice, seed, RngDraws, SaveVersion |
 | `Game/GameEvent.cs` | `DiceRolled`, `JokerActivated`, `ScoreCommitted`, `UpperBonusSecured`, `TurnChanged`, `GameEnded` |
 | `Game/GameEngine.cs` | Sole mutator. Throws on illegal actions. `Roll`/`SetKeep`/`GetLegalCategories`/`GetPotentialScores`/`ScoreCategory`, `NewGame(seed)`/`FromState(state)` |
-| `AI/OmaAI.cs` | `DecideKeepers` (32 subsets), `DecideCategory`, `RankForHint` (player hints, same valuation) |
+| `AI/OmaAI.cs` | `DecideKeepers` (32 subsets), `DecideCategory`, `RankForHint` (player hints, same valuation), `Advise` (**Ask Oma** — same evaluator, returns a `KeepAdvice`) |
+| `AI/KeepAdvice.cs` | Structured hint: keep flags, reroll count, whether to score now, the box she is aiming at. Wording lives in presentation |
 
 ### Services (`Assets/Scripts/Services`, asmdef `Yahtzee.Services`)
 
@@ -120,6 +123,8 @@ Results XML parses with `[xml]$r = Get-Content out.xml; $r."test-run"` → `tota
 - **`CameraDirector`** — 4 framings (Default / DiceFocus / ScorecardFocus / OmaFocus), 0.5 s eased blends.
 - **`OmaView`** — idle rotation (idle/shift/talking, 5–12 s) + `PlayReaction(Clap|Disbelief)`.
 - **`ScorecardBuilder`** — the one grid builder for both layers. `BuildInto(rect, …)` fills any RectTransform with the 13 boxes + title + bonus row; `BuildWorld(…)` wraps that in a **world-space canvas** lying on the table, propped 24° at the player, on a backing board. Card geometry (size, tilt, z) is a block of named constants at the top of the file — tune there, then re-run the framing renders.
+- **`SpeechBubbleView`** — Oma's bubble: replace-don't-queue, auto-dismiss, and **nothing in it is a raycast target** so it can never eat a tap (design §5.2, asserted by `AskOmaTests`). The component sits on an always-active holder, not on the panel it hides, or its `Update` would never run. M5's `DialogueService` should drive this API unchanged.
+- **`OmaHints`** — wording for `KeepAdvice`: advice always in plain English, one German flavour line appended (baking, or her bichon frisé *Tiny Bubbles Sunshine*), never repeating twice running. M5 moves the pool into the `OmaDialogueSet` ScriptableObject.
 - **`UiBuilder`** — screen-space uGUI built in code. With `worldDice: true` it keeps only the non-diegetic strip (header, status, action bar, peek, overlays); background, 2D dice row and scorecard all drop away. **`ScorecardView`/`ScoreCellView`** (ghosts, two-tap confirm, Joker dimming, gold hint highlights, bonus bar) are shared verbatim by both layers, **`HudView`** (roll pips, status, totals, skip overlay, peek button, game-over panel), `SafeAreaFitter`, `UiPalette`.
 
 **Two constraints the diegetic card creates.** Both are asserted by `WorldScorecardTests`, which also prints measured spans so retuning is reading numbers off a test run rather than guessing.
@@ -134,7 +139,8 @@ Results XML parses with `[xml]$r = Get-Content out.xml; $r."test-run"` → `tota
 ### Tests
 
 - **EditMode (94)** — exhaustive 7,776-combination scoring sweep vs. a naive oracle, scorecard bonus edges (62/63/64), every Joker branch, engine legality/turn-flow/events with scripted RNG, 200-seed headless games with event-rebuilt totals, save round-trip + resume determinism, 6 AI tests (determinism, query-purity, made-hand keeps, Joker legality, box protection, 1000-game strength band).
-- **PlayMode (15)** — `GameFlowPlayModeTests` (full game vs. auto-Oma, one-box-per-turn, skip under real pacing, save/reload resume, illegal-tap no-ops, 2D-layer regression) · `DiceSoakTests` (**1,000 rolls × 5 dice all rest on engine values, inside the roll zone**, mid-tumble skip) · `FramingCaptureTests` (renders each framing to PNG) · `WorldScorecardTests` (card is world-space + raycastable, rests on the table clear of the dice, fully visible and ≥64 px per box in every scoring framing, and **no die is ever hidden behind it**) · `DiceTapTests` (tapping a die picks *that* die from every framing, and keep/release round-trips).
+- **EditMode also covers** `OmaAdviceTests` — Ask Oma keeps the right dice, names a coherent goal, stands pat on a made hand, and above all is **free**: 25 consecutive asks change neither `RngDraws` nor any state.
+- **PlayMode (19)** — `GameFlowPlayModeTests` (full game vs. auto-Oma, one-box-per-turn, skip under real pacing, save/reload resume, illegal-tap no-ops, 2D-layer regression) · `DiceSoakTests` (**1,000 rolls × 5 dice all rest on engine values, inside the roll zone, and never overlapping each other**, mid-tumble skip) · `FramingCaptureTests` (renders each framing to PNG) · `WorldScorecardTests` (card is world-space + raycastable, rests on the table clear of the dice, fully visible and ≥64 px per box in every scoring framing, and **no die is ever hidden behind it**) · `DiceTapTests` (tapping a die picks *that* die from every framing, and keep/release round-trips) · `AskOmaTests` (bubble shows advice, swallows no taps, changes nothing, no-ops when there is nothing to advise on).
 
 **Mind the gap between "the controller works" and "the player can do it."** Every other PlayMode test drives `GameController.OnDieTapped` directly, so for the whole of M4 the suite was green while tap-to-keep was impossible to actually perform — the fence collider sat between the camera and the dice and swallowed the pick. `DiceTapTests` closes that specific gap; the same blind spot still exists for **scorecard cell taps**, which no test drives through the GraphicRaycaster.
 
@@ -158,6 +164,7 @@ Results XML parses with `[xml]$r = Get-Content out.xml; $r."test-run"` → `tota
 | **DiceFocus is transient — camera eases back on settle** (M4) | *Owner approved 2026-07-20; supersedes the literal reading of design §5.2 ("push in over the dice **when they settle**").* A physical card means any framing the player can score from must show all 13 boxes, and DiceFocus crops it badly (verified in the renders). The push-in now plays during the tumble and eases to Default once dice rest, where dice stay clearly legible. Rejected alternative: hold the push-in ~0.8 s then ease back — more literal to the spec, but boxes are unreachable during the hold, so a tap can land on nothing |
 | **UI built in code, not prefabs** (M2) | The 2D layer is throwaway scaffolding; code keeps the whole layout reviewable and diffable |
 | German flavor phrases in Oma's dialogue | Owner approved; flavor only, never rules-critical; game stays English-only |
+| **"Ask Oma" hint is free and unlimited** | Owner-requested. She runs `OmaAI.Advise` — the *same* subset evaluator she plays by, so she gives away her own reasoning rather than peeking at anything hidden. It is a pure query: no RNG draws, no mutation (asserted in `OmaAdviceTests` / `AskOmaTests`), so a player who asks every turn gets identical dice to one who never asks. No cost/limit, matching the cozy no-meta decision |
 | Restart = no consequence; no stats/meta/monetization in v1 | Owner decision; cozy game |
 | Trademark flag | "Yahtzee" is Hasbro's; possible rename pre-release; no Hasbro assets ever |
 
@@ -184,7 +191,7 @@ Results XML parses with `[xml]$r = Get-Content out.xml; $r."test-run"` → `tota
 ### M5 — Oma lives (not started)
 
 - `DialogueService` subscribing to the same `GameEvent`s, mapping to trigger types, picking unused variants from an `OmaDialogueSet` ScriptableObject (per-game no-repeat set).
-- `SpeechBubbleController` — auto-dismiss ~3.5 s, replace-don't-queue, **never blocks input**.
+- ~~`SpeechBubbleController`~~ — **done early**, as `SpeechBubbleView`, to carry the Ask Oma hint. Auto-dismiss, replace-don't-queue, never blocks input. `DialogueService` should drive it as-is.
 - Full v1 trigger/line set per design §2 (3+ variants each, German flavor phrases).
 - Real Oma model integration; expression tech (blend shapes vs. material/UV swap) still undecided — decide with the artist. `OmaView`'s API stays the same either way.
 

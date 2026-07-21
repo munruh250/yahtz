@@ -19,6 +19,7 @@ namespace Yahtzee.Presentation
             /// <summary>Null in 3D mode — the card is diegetic there, built by KitchenBuilder.</summary>
             public ScorecardView Scorecard;
             public HudView Hud;
+            public SpeechBubbleView SpeechBubble;
         }
 
         public static string DisplayName(Category category) => Names[(int)category];
@@ -60,7 +61,8 @@ namespace Yahtzee.Presentation
                 refs.Dice = BuildDiceRow(safe, controller);
                 refs.Scorecard = BuildScorecard(safe, controller);
             }
-            BuildActionBar(safe, controller, out var rollButton, out var rollLabel);
+            BuildActionBar(safe, controller, out var rollButton, out var rollLabel, out var askButton);
+            refs.SpeechBubble = BuildSpeechBubble(safe);
 
             // Sibling order = raycast/draw order: skip overlay above the play surface,
             // peek toggle above the overlay, game-over scrim above everything.
@@ -70,7 +72,7 @@ namespace Yahtzee.Presentation
 
             refs.Hud = safe.gameObject.AddComponent<HudView>();
             refs.Hud.Init(rollButton, rollLabel, status, header, gameOverPanel, gameOverText,
-                skipOverlay, peekButton, peekLabel);
+                skipOverlay, peekButton, peekLabel, askButton);
             return refs;
         }
 
@@ -145,11 +147,14 @@ namespace Yahtzee.Presentation
             button = bg.gameObject;
         }
 
-        private static void BuildActionBar(RectTransform parent, GameController controller, out Button rollButton, out TextMeshProUGUI rollLabel)
+        private static void BuildActionBar(RectTransform parent, GameController controller,
+            out Button rollButton, out TextMeshProUGUI rollLabel, out Button askButton)
         {
             var bar = Rect(parent, "ActionBar", new Vector2(0.02f, 0.005f), new Vector2(0.98f, 0.105f));
 
-            var rollBg = Image(bar, "RollButton", new Vector2(0f, 0.08f), new Vector2(0.66f, 0.95f), UiPalette.Gold);
+            // Roll stays the widest — it is the primary action. Ask Oma sits beside it; New Game
+            // is rare and destructive, so it gets the smallest, furthest target.
+            var rollBg = Image(bar, "RollButton", new Vector2(0f, 0.08f), new Vector2(0.45f, 0.95f), UiPalette.Gold);
             rollButton = rollBg.gameObject.AddComponent<Button>();
             rollButton.targetGraphic = rollBg;
             rollButton.onClick.AddListener(controller.OnRollTapped);
@@ -157,12 +162,39 @@ namespace Yahtzee.Presentation
                 Vector2.zero, Vector2.one);
             rollLabel.fontStyle = FontStyles.Bold;
 
-            var newBg = Image(bar, "NewGameButton", new Vector2(0.70f, 0.08f), new Vector2(1f, 0.95f), UiPalette.Panel);
+            var askBg = Image(bar, "AskOmaButton", new Vector2(0.48f, 0.08f), new Vector2(0.79f, 0.95f), UiPalette.GoldSoft);
+            askButton = askBg.gameObject.AddComponent<Button>();
+            askButton.targetGraphic = askBg;
+            askButton.onClick.AddListener(controller.OnAskOmaTapped);
+            Text(askBg.rectTransform, "Label", "Ask Oma", 38f, UiPalette.Ink, TextAlignmentOptions.Center,
+                Vector2.zero, Vector2.one).fontStyle = FontStyles.Bold;
+
+            var newBg = Image(bar, "NewGameButton", new Vector2(0.82f, 0.08f), new Vector2(1f, 0.95f), UiPalette.Panel);
             var newButton = newBg.gameObject.AddComponent<Button>();
             newButton.targetGraphic = newBg;
             newButton.onClick.AddListener(controller.OnNewGameTapped);
-            Text(newBg.rectTransform, "Label", "New Game", 34f, UiPalette.Cream, TextAlignmentOptions.Center,
+            Text(newBg.rectTransform, "Label", "New\nGame", 26f, UiPalette.Cream, TextAlignmentOptions.Center,
                 Vector2.zero, Vector2.one);
+        }
+
+        /// <summary>Oma's speech bubble, sitting under her in the top zone (design §5.2). Nothing
+        /// in it is a raycast target: it must never eat a tap meant for the dice or the card.</summary>
+        private static SpeechBubbleView BuildSpeechBubble(RectTransform parent)
+        {
+            // The view lives on a holder that stays active, not on the panel it switches off —
+            // otherwise its Update never runs and nothing can find it.
+            var holder = Rect(parent, "SpeechBubble", new Vector2(0.06f, 0.60f), new Vector2(0.94f, 0.755f));
+            var view = holder.gameObject.AddComponent<SpeechBubbleView>();
+
+            var panel = Image(holder, "Bubble", Vector2.zero, Vector2.one, UiPalette.Cream);
+            panel.raycastTarget = false;
+            var text = Text(panel.rectTransform, "Text", "", 32f, UiPalette.Ink, TextAlignmentOptions.Center,
+                new Vector2(0.04f, 0.06f), new Vector2(0.96f, 0.94f));
+            text.enableWordWrapping = true;
+            text.overflowMode = TextOverflowModes.Truncate;
+
+            view.Init(panel.gameObject, text);
+            return view;
         }
 
         private static void BuildGameOver(RectTransform parent, GameController controller, out GameObject panel, out TextMeshProUGUI text)

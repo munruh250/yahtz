@@ -37,6 +37,7 @@ namespace Yahtzee.Presentation
         private IDiceView _dice;
         private ScorecardView _scorecard;
         private HudView _hud;
+        private SpeechBubbleView _speech;
         private CameraDirector _cameraDirector; // null in 2D mode
         private OmaView _omaView;               // null in 2D mode or before assets import
 
@@ -51,6 +52,7 @@ namespace Yahtzee.Presentation
             Application.targetFrameRate = 60;
             var refs = UiBuilder.Build(transform, this, Use3dDice);
             _hud = refs.Hud;
+            _speech = refs.SpeechBubble;
             if (Use3dDice)
             {
                 // In 3D the card is a physical object on the table, so the kitchen owns it.
@@ -91,6 +93,7 @@ namespace Yahtzee.Presentation
             _toast = null;
             InputLocked = false;
             _hud.HideGameOver();
+            _speech.Hide(); // a hint about the previous game's dice would be nonsense
             RefreshAll();
 
             // A loaded save may resume mid-Oma-turn.
@@ -149,6 +152,21 @@ namespace Yahtzee.Presentation
             _fastForward = true;
             _dice.SkipAnimation();
         }
+
+        /// <summary>"Ask Oma": she runs her own keep evaluation on your dice and says what she
+        /// would do. Read-only — a pure query on engine state, so it consumes no RNG and cannot
+        /// change the game however often it is used.</summary>
+        public void OnAskOmaTapped()
+        {
+            if (!CanAskOma)
+                return;
+            var advice = _oma.Advise(Engine);
+            _speech.Show(OmaHints.Compose(advice, Engine.State.Dice.Values), OmaHints.BubbleSeconds);
+        }
+
+        private bool CanAskOma =>
+            Engine != null && !InputLocked && !IsOmaTurn && !_peekOther
+            && Engine.State.Phase == GamePhase.Deciding;
 
         public void OnPeekTapped()
         {
@@ -334,6 +352,7 @@ namespace Yahtzee.Presentation
                 Engine.RollsRemaining);
             _hud.SetOmaTurn(IsOmaTurn);
             _hud.SetPeek(state.Phase != GamePhase.GameOver, PeekLabel(state));
+            _hud.SetAskOma(CanAskOma);
             _dice.SetDice(state.Dice.Values, state.Dice.Kept);
             _dice.SetInteractable(!InputLocked && !IsOmaTurn && deciding && Engine.RollsRemaining > 0);
             _scorecard.Render(displayedCard, potentials, _selected, suggested);

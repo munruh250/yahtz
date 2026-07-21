@@ -222,6 +222,87 @@ namespace Yahtzee.Core
             return result;
         }
 
+        // ---- "Ask Oma" (player-facing keep advice) --------------------------
+
+        /// <summary>What Oma would do with the player's dice right now. Runs the same subset
+        /// evaluation she plays by — she gives away her own reasoning, she does not peek at
+        /// anything the player cannot see, and being a pure function of state it cannot alter
+        /// the game (no RNG draws, no mutation).</summary>
+        public KeepAdvice Advise(GameEngine engine)
+        {
+            if (engine.State.Phase != GamePhase.Deciding)
+                throw new InvalidOperationException("No dice to advise on.");
+
+            // Rolls spent: the only question left is which box to take.
+            if (engine.RollsRemaining == 0)
+                return ScoreNowAdvice(engine);
+
+            var keep = DecideKeepers(engine);
+            foreach (bool k in keep)
+                if (!k)
+                    return new KeepAdvice(keep, scoreNow: false, DeriveGoal(engine, keep), 0);
+
+            // She would stand pat, so the hand is already what it is going to be.
+            return ScoreNowAdvice(engine);
+        }
+
+        private static KeepAdvice ScoreNowAdvice(GameEngine engine)
+        {
+            var ranked = RankForHint(engine, 1);
+            var (category, points) = ranked.Count > 0 ? ranked[0] : (Category.Chance, 0);
+            return new KeepAdvice(KeepAll(), scoreNow: true, category, points);
+        }
+
+        /// <summary>Names what a keep subset is chasing, so the hint can say *why*. Descriptive
+        /// only — the keep decision itself comes from the tuned evaluator above, and this reads
+        /// the same kept dice to label it.</summary>
+        private static Category DeriveGoal(GameEngine engine, bool[] keep)
+        {
+            var dice = engine.State.Dice.Values;
+            var card = engine.CurrentCard;
+            Span<int> counts = stackalloc int[7];
+            for (int i = 0; i < DiceState.DieCount; i++)
+                if (keep[i])
+                    counts[dice[i]]++;
+
+            int bestFace = 0, bestCount = 0;
+            for (int face = 1; face <= 6; face++)
+                if (counts[face] > bestCount)
+                {
+                    bestCount = counts[face];
+                    bestFace = face;
+                }
+
+            // Two pair kept with the box open reads as a full-house draw, not an of-a-kind one.
+            if (CountPairs(counts) == 2 && card.IsOpen(Category.FullHouse))
+                return Category.FullHouse;
+
+            if (bestCount >= 2)
+            {
+                if (bestCount >= 3 && card.IsOpen(Category.Yahtzee))
+                    return Category.Yahtzee;
+                if (bestCount >= 3 && card.IsOpen(Category.FourOfAKind))
+                    return Category.FourOfAKind;
+                if (card.IsOpen(Category.ThreeOfAKind))
+                    return Category.ThreeOfAKind;
+                var upper = CategoryExtensions.UpperCategoryForFace(bestFace);
+                if (card.IsOpen(upper))
+                    return upper;
+                if (card.IsOpen(Category.FourOfAKind))
+                    return Category.FourOfAKind;
+            }
+
+            if (HasNoDuplicates(counts) && LongestRun(counts) >= 3)
+            {
+                if (card.IsOpen(Category.LargeStraight))
+                    return Category.LargeStraight;
+                if (card.IsOpen(Category.SmallStraight))
+                    return Category.SmallStraight;
+            }
+
+            return Category.Chance;
+        }
+
         // ---- Helpers -------------------------------------------------------
 
         private static bool UpperBonusReachable(Scorecard card)

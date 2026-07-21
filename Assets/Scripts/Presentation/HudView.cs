@@ -19,11 +19,13 @@ namespace Yahtzee.Presentation
         private GameObject _skipOverlay;
         private GameObject _peekButton;
         private TextMeshProUGUI _peekLabel;
+        private Button _askButton;
 
         public void Init(Button rollButton, TextMeshProUGUI rollLabel, TextMeshProUGUI status,
             TextMeshProUGUI header, GameObject gameOverPanel, TextMeshProUGUI gameOverText,
-            GameObject skipOverlay, GameObject peekButton, TextMeshProUGUI peekLabel)
+            GameObject skipOverlay, GameObject peekButton, TextMeshProUGUI peekLabel, Button askButton)
         {
+            _askButton = askButton;
             _rollButton = rollButton;
             _rollLabel = rollLabel;
             _status = status;
@@ -53,6 +55,9 @@ namespace Yahtzee.Presentation
             // Middle-dot pips: filled = rolls left this turn.
             _rollLabel.text = rollsRemaining > 0 ? $"Roll  {new string('·', rollsRemaining)}" : "Roll";
         }
+
+        /// <summary>Only offer a hint when there are dice on the table to advise about.</summary>
+        public void SetAskOma(bool enabled) => _askButton.interactable = enabled;
 
         public void SetStatus(string text) => _status.text = text;
 

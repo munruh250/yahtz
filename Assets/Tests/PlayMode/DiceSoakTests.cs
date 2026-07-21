@@ -81,6 +81,17 @@ namespace Yahtzee.Tests
                         && p.z < KitchenBuilder.RollZoneMaxZ + Slack
                         && p.y > -0.05f && p.y < 0.25f,
                         $"roll {roll} die {i}: left the roll zone at {p}");
+
+                    // No die may end up inside another. A die can land on top of one and is then
+                    // dropped to table height when it settles, so without unstacking they
+                    // intersect — visible, and it makes the values hard to read.
+                    for (int j = i + 1; j < 5; j++)
+                    {
+                        var q = kitchen.Dice.Dice[j].transform.position;
+                        float gap = Mathf.Sqrt((p.x - q.x) * (p.x - q.x) + (p.z - q.z) * (p.z - q.z));
+                        Assert.GreaterOrEqual(gap, 0.09f - Slack,
+                            $"roll {roll}: dice {i} and {j} overlap ({gap:F3} apart) at {p} / {q}");
+                    }
                 }
             }
         }

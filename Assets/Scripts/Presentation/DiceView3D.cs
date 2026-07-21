@@ -162,10 +162,72 @@ namespace Yahtzee.Presentation
             foreach (var die in _dice)
                 if (die.gameObject.activeSelf && !die.Settled)
                     return;
+            Unstack();
             var settled = _pendingSettled;
             _pendingSettled = null;
             settled();
         }
+
+        /// <summary>Push apart any loose dice that ended up overlapping.
+        ///
+        /// A die can come to rest on top of another; settling forces it down to table height, so
+        /// without this it would end up intersecting the die it was resting on. Relaxation in XZ
+        /// only — faces and yaw are already correct and must not change — clamped to the roll
+        /// zone so unstacking can never push a die out from under the fence.</summary>
+        private void Unstack()
+        {
+            const float minGap = 0.095f;  // a hair over the 0.09 die width
+            const float halfDie = 0.045f;
+            float maxX = KitchenBuilder.RollZoneHalfX - halfDie;
+            float minZ = KitchenBuilder.RollZoneMinZ + halfDie;
+            float maxZ = KitchenBuilder.RollZoneMaxZ - halfDie;
+
+            for (int pass = 0; pass < 12; pass++)
+            {
+                bool moved = false;
+                for (int i = 0; i < _dice.Length; i++)
+                {
+                    if (!IsLoose(i))
+                        continue;
+                    for (int j = i + 1; j < _dice.Length; j++)
+                    {
+                        if (!IsLoose(j))
+                            continue;
+                        var a = _dice[i].transform.position;
+                        var b = _dice[j].transform.position;
+                        float dx = b.x - a.x, dz = b.z - a.z;
+                        float distance = Mathf.Sqrt(dx * dx + dz * dz);
+                        if (distance >= minGap)
+                            continue;
+
+                        // Exactly coincident: pick a deterministic direction from the indices so
+                        // the soak stays reproducible.
+                        if (distance < 1e-4f)
+                        {
+                            float angle = (i * 5 + j) * Mathf.PI / 4f;
+                            dx = Mathf.Cos(angle);
+                            dz = Mathf.Sin(angle);
+                            distance = 1f;
+                        }
+                        float push = (minGap - distance) / 2f;
+                        float ux = dx / distance, uz = dz / distance;
+                        _dice[i].SlideTo(
+                            Mathf.Clamp(a.x - ux * push, -maxX, maxX),
+                            Mathf.Clamp(a.z - uz * push, minZ, maxZ));
+                        _dice[j].SlideTo(
+                            Mathf.Clamp(b.x + ux * push, -maxX, maxX),
+                            Mathf.Clamp(b.z + uz * push, minZ, maxZ));
+                        moved = true;
+                    }
+                }
+                if (!moved)
+                    return;
+            }
+        }
+
+        /// <summary>A die on the table from the throw — kept dice sit in their own row and are
+        /// placed exactly, so they neither move nor collide.</summary>
+        private bool IsLoose(int index) => _dice[index].gameObject.activeSelf && !_placedKept[index];
 
         /// <summary>Don't steal a tap that landed on the scorecard or the action bar. The no-arg
         /// overload only tracks the mouse pointer, so on a touch device it always reports false

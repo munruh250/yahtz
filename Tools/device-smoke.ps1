@@ -63,6 +63,11 @@ if (-not $SkipBuild) {
     Get-Content $buildLog | Select-String "SMOKEBUILD" | ForEach-Object { $_.Line }
 }
 
+# adb chats on stderr routinely ("daemon not running; starting now"), and with
+# ErrorActionPreference=Stop PowerShell turns that into a terminating NativeCommandError.
+$ErrorActionPreference = "Continue"
+& $adb start-server | Out-Null
+
 if (-not (& $adb devices | Select-String "\sdevice$")) {
     Write-Host "No authorised device. Enable USB debugging and accept the on-phone prompt."
     & $adb devices -l
