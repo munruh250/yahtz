@@ -270,7 +270,8 @@ namespace Yahtzee.Presentation
             var oma = Object.Instantiate(prefab, root);
             oma.name = "Oma";
             // Seated across the table, facing the player, under the lamp pool.
-            oma.transform.localPosition = new Vector3(0f, TableY - 0.75f, 1.05f); // feet on floor, table height ~0.75
+            // Far enough back that her idle hand gestures clear the table edge (z 0.85).
+            oma.transform.localPosition = new Vector3(0f, TableY - 0.75f, 1.24f);
             oma.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
 
             // Placeholder look: the Mixamo body ships untextured; a soft cardigan-purple
@@ -358,7 +359,9 @@ namespace Yahtzee.Presentation
             var restSlots = new Vector3[DiceState.DieCount];
             var keepSlots = new Vector3[DiceState.DieCount];
             var keepMarkers = new Transform[DiceState.DieCount];
-            var faceMat = Mat(UiPalette.DieFace);
+            var skin = DiceSkins.Selected;
+            var faceMat = Mat(skin.Face);
+            var pipMat = Mat(skin.Pip); // shared, so a skin change re-tints every die at once
 
             for (int i = 0; i < DiceState.DieCount; i++)
             {
@@ -383,12 +386,13 @@ namespace Yahtzee.Presentation
 
                 var die = go.AddComponent<Die3D>();
                 die.Init(i, TableY + DieSize / 2f);
-                AddPips(go.transform);
+                AddPips(go.transform, pipMat);
                 go.SetActive(false); // hidden until first roll
                 dice[i] = die;
             }
 
             view.Init(dice, camera, controller, ThrowOrigin, restSlots, keepSlots, keepMarkers);
+            view.InitMaterials(faceMat, pipMat);
             return view;
         }
 
@@ -409,9 +413,8 @@ namespace Yahtzee.Presentation
         }
 
         /// <summary>Quad pips on each face so values read at a glance even gray-boxed.</summary>
-        private static void AddPips(Transform die)
+        private static void AddPips(Transform die, Material pipMat)
         {
-            var pipMat = Mat(UiPalette.DiePip);
             // face value → (local normal, up-axis on that face)
             (int value, Vector3 normal, Vector3 up)[] faces =
             {

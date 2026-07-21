@@ -18,6 +18,7 @@ namespace Yahtzee.Presentation
         private Vector3[] _restSlots;
         private Vector3[] _keepSlots;
         private Transform[] _keepMarkers;
+        private Material _faceMaterial, _pipMaterial;
         private bool _interactable;
 
         /// <summary>Ray length for tap picking — the seated framings sit ~2.5 m from the table.</summary>
@@ -113,6 +114,20 @@ namespace Yahtzee.Presentation
         }
 
         public void SetInteractable(bool interactable) => _interactable = interactable;
+
+        /// <summary>The face and pip materials are shared across all five dice, so re-tinting them
+        /// is the whole of a skin change. Cosmetic only — values come from the engine.</summary>
+        public void InitMaterials(Material face, Material pip)
+        {
+            _faceMaterial = face;
+            _pipMaterial = pip;
+        }
+
+        public void ApplySkin(DiceSkins.Skin skin)
+        {
+            if (_faceMaterial != null) _faceMaterial.color = skin.Face;
+            if (_pipMaterial != null) _pipMaterial.color = skin.Pip;
+        }
 
         /// <summary>The gold pad under a kept die — the visible half of "this one is staying".</summary>
         private void ShowKeepMarker(int index, bool visible) => _keepMarkers[index].gameObject.SetActive(visible);

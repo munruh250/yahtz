@@ -32,12 +32,27 @@ namespace Yahtzee.Presentation
             && Engine.State.CurrentPlayer == PlayerId.Oma
             && Engine.State.Phase != GamePhase.GameOver;
 
-        private readonly OmaAI _oma = new OmaAI();
+        // Built in Awake, not here: reading PlayerPrefs from a field initializer runs in the
+        // MonoBehaviour constructor, which Unity forbids.
+        private OmaAI _oma;
+
+        /// <summary>Difficulty is the sloppiness knob OmaAI reserved for exactly this. The RNG is
+        /// seeded per game so a session replays identically; see HANDOFF for the one caveat
+        /// (mid-game resume does not restore the epsilon draw count, only the dice stream).</summary>
+        private static OmaAI BuildOma()
+        {
+            double sloppiness = GameSettings.SloppinessFor(GameSettings.SelectedDifficulty);
+            return sloppiness > 0
+                ? new OmaAI(sloppiness, new System.Random(unchecked(Environment.TickCount * 397)))
+                : new OmaAI();
+        }
 
         private IDiceView _dice;
         private ScorecardView _scorecard;
         private HudView _hud;
         private SpeechBubbleView _speech;
+        private ScreensView _screens;
+        private DiceView3D _dice3d;   // null in 2D mode
         private OmaView _omaView;               // null in 2D mode or before assets import
 
         private Category? _selected;   // player's pending confirm, or Oma's flash
@@ -49,14 +64,17 @@ namespace Yahtzee.Presentation
         private void Awake()
         {
             Application.targetFrameRate = 60;
+            _oma = BuildOma();
             var refs = UiBuilder.Build(transform, this, Use3dDice);
             _hud = refs.Hud;
             _speech = refs.SpeechBubble;
+            _screens = refs.Screens;
             if (Use3dDice)
             {
                 // In 3D the card is a physical object on the table, so the kitchen owns it.
                 var kitchen = KitchenBuilder.Build(transform, this, Camera.main);
                 _dice = kitchen.Dice;
+                _dice3d = kitchen.Dice;
                 _scorecard = kitchen.Scorecard;
                 _omaView = kitchen.Oma;
             }
@@ -71,7 +89,22 @@ namespace Yahtzee.Presentation
         {
             var saved = SaveService.HasResumableSave() ? SaveService.TryLoad() : null;
             AttachEngine(saved != null ? GameEngine.FromState(saved) : GameEngine.NewGame(NewSeed()));
+
+            // Skins and difficulty can change while the game sits behind a screen.
+            GameSettings.Changed += OnSettingsChanged;
+            OnSettingsChanged();
+
+            // Tests drive the board directly and would be blocked by a title card.
+            if (_screens != null && AnimationsEnabled)
+                _screens.Show(ScreensView.Screen.Title);
         }
+
+        private void OnDestroy()
+        {
+            GameSettings.Changed -= OnSettingsChanged;
+        }
+
+        private void OnSettingsChanged() => _dice3d?.ApplySkin(DiceSkins.Selected);
 
         private void AttachEngine(GameEngine engine)
         {
@@ -179,8 +212,12 @@ namespace Yahtzee.Presentation
         public void OnNewGameTapped()
         {
             SaveService.Delete();
+            _oma = BuildOma(); // pick up any difficulty change
             AttachEngine(GameEngine.NewGame(NewSeed()));
         }
+
+        /// <summary>The hamburger opens the Home screen (design §5.1's pause overlay in embryo).</summary>
+        public void OnMenuTapped() => _screens?.Show(ScreensView.Screen.Home);
 
         // ---- Oma's turn ------------------------------------------------------
 
@@ -351,7 +388,7 @@ namespace Yahtzee.Presentation
 
             _hud.SetHeader(state);
             _hud.SetRoll(!InputLocked && !IsOmaTurn && state.Phase != GamePhase.GameOver && Engine.RollsRemaining > 0,
-                Engine.RollsRemaining);
+                state.Dice.RollsUsed);
             _hud.SetOmaTurn(IsOmaTurn);
             _dice.SetDice(state.Dice.Values, state.Dice.Kept);
             _dice.SetInteractable(!InputLocked && !IsOmaTurn && deciding && Engine.RollsRemaining > 0);
@@ -375,23 +412,22 @@ namespace Yahtzee.Presentation
                 return InputLocked || deciding || state.Phase == GamePhase.TurnStart
                     ? $"{toast}Oma's turn - tap anywhere to skip"
                     : $"{toast}Oma's turn";
-            if (!deciding)
-                return $"{toast}Your turn - tap Roll";
-            if (InputLocked)
-                return "Rolling...";
             if (_peekOther)
                 return "Oma's card - tap it again to go back";
             if (_selected.HasValue && potentials != null)
                 return $"{toast}Tap again to confirm: {UiBuilder.DisplayName(_selected.Value)} for {potentials[_selected.Value]}";
-            if (Engine.IsJokerTurn)
+            // Joker is rules-critical: it restricts which boxes are legal, so it always speaks up.
+            if (deciding && Engine.IsJokerTurn)
                 return JokerRules.BonusApplies(Engine.CurrentCard)
                     ? "Joker rules! +100 bonus - you must use a highlighted box"
                     : "Joker rules! You must use a highlighted box";
-            if (Engine.RollsRemaining > 0)
-                return $"{toast}Roll {state.Dice.RollsUsed} of 3 done - tap dice to keep, roll again, or score";
-            return suggested != null && suggested.Count > 0 && potentials != null
-                ? $"{toast}No rolls left - best: {UiBuilder.DisplayName(suggested[0])} for {potentials[suggested[0]]}"
-                : $"{toast}Choose a score";
+            if (deciding && Engine.RollsRemaining == 0 && suggested != null && suggested.Count > 0 && potentials != null)
+                return $"{toast}Best: {UiBuilder.DisplayName(suggested[0])} for {potentials[suggested[0]]}";
+
+            // Otherwise the line just says where we are in the game. The old per-roll narration
+            // ("Roll 2 of 3 done - tap dice to keep...") duplicated the roll pips and the taps it
+            // described are on the table, not the HUD.
+            return $"{toast}Round {state.Round} of {GameState.TotalRounds}";
         }
 
         // ---- Lifecycle safety ----------------------------------------------

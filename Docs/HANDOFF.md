@@ -115,6 +115,10 @@ Results XML parses with `[xml]$r = Get-Content out.xml; $r."test-run"` → `tota
 
 `SaveService` — JsonUtility → `persistentDataPath/save.json`, version int, `TryLoad`/`HasResumableSave`/`Delete`.
 
+`GameSettings` — PlayerPrefs, not the save file: difficulty, chosen dice skin and what you own all outlive any single game, and wiping a game must not wipe what you bought. Raises `Changed` so the table re-tints live.
+
+**Difficulty maps to `OmaAI`'s sloppiness knob** (Gentle 0.30 / Normal 0.10 / Sharp 0.0 — how often she takes her second-best box). ⚠️ **Pre-ship caveat:** the ε draws are *not* persisted the way `RngDraws` is, so resuming a saved game mid-way can diverge from an uninterrupted one at any difficulty above Sharp. Skip is unaffected — ε is only consumed in `DecideCategory`, once per turn. Fix before release by persisting the ε draw count alongside `RngDraws`.
+
 ### Presentation (`Assets/Scripts/Presentation`, asmdef `Yahtzee.Presentation`)
 
 - **`GameController`** — owns engine, subscribes to events, sequences everything. Input entry points: `OnRollTapped`, `OnDieTapped`, `OnCellTapped`, `OnSkipTapped`, `OnPeekTapped`, `OnNewGameTapped`. Two static flags: **`AnimationsEnabled`** (tests set false → everything instant) and **`Use3dDice`** (false → the 2D layer, kept per TECH_PLAN §7).
@@ -125,6 +129,8 @@ Results XML parses with `[xml]$r = Get-Content out.xml; $r."test-run"` → `tota
 - **`OmaView`** — idle rotation (idle/shift/talking, 5–12 s) + `PlayReaction(Clap|Disbelief)`.
 - **`ScorecardBuilder`** — the one grid builder for both layers, styled after the real Yahtzee pad: white stock, black ink, grey UPPER/LOWER section bands, hairline rules, and the printed hints (`=1`…`=6`, and 25/30/40/50 on the fixed boxes). No repeat game columns — this card only ever tracks one game. `BuildInto(rect, …)` fills any RectTransform with the 13 boxes + title + bonus row; `BuildWorld(…)` wraps that in a **world-space canvas** lying on the table, propped 24° at the player, on a backing board. Card geometry (size, tilt, z) is a block of named constants at the top of the file — tune there, then re-run the framing renders.
 - **`SpeechBubbleView`** — Oma's bubble: replace-don't-queue, auto-dismiss, and **nothing in it is a raycast target** so it can never eat a tap (design §5.2, asserted by `AskOmaTests`). The component sits on an always-active holder, not on the panel it hides, or its `Update` would never run. M5's `DialogueService` should drive this API unchanged.
+- **`ScreensView` / `ScreensBuilder`** — the front-end: Title ("Dice with Oma") → Home → Settings / Store. Placeholder shells for M6's real Title/Results/Pause, but settings and store *function*: difficulty and dice skins persist and take effect immediately. Full-screen and opaque, so nothing behind them is tappable. The hamburger opens Home.
+- **`DiceSkins`** — cosmetic dice colours (Classic, Ruby). The engine decides values and physics is theatre, so a skin can never touch gameplay. `DiceView3D.ApplySkin` re-tints the two shared materials, so a change repaints all five dice at once.
 - **`OmaHints`** — wording for `KeepAdvice`: advice always in plain English, one German flavour line appended (baking, or her bichon frisé *Tiny Bubbles Sunshine*), never repeating twice running. M5 moves the pool into the `OmaDialogueSet` ScriptableObject.
 - **`UiBuilder`** — screen-space uGUI built in code. With `worldDice: true` it keeps only the non-diegetic strip (header, status, action bar, peek, overlays); background, 2D dice row and scorecard all drop away. **`ScorecardView`/`ScoreCellView`** (ghosts, two-tap confirm, Joker dimming, gold hint highlights, bonus bar) are shared verbatim by both layers, **`HudView`** (roll pips, status, totals, skip overlay, peek button, game-over panel), `SafeAreaFitter`, `UiPalette`.
 

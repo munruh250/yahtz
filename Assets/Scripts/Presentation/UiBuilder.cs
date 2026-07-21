@@ -20,6 +20,7 @@ namespace Yahtzee.Presentation
             public ScorecardView Scorecard;
             public HudView Hud;
             public SpeechBubbleView SpeechBubble;
+            public ScreensView Screens;
         }
 
         public static string DisplayName(Category category) => Names[(int)category];
@@ -55,7 +56,7 @@ namespace Yahtzee.Presentation
             safe.gameObject.AddComponent<SafeAreaFitter>();
 
             var refs = new Refs();
-            BuildHeaderAndStatus(safe, out var header, out var status, out var menuButton, out var menuPanel);
+            BuildHeaderAndStatus(safe, controller, out var header, out var status, out var menuButton, out var menuPanel);
             if (!worldDice)
             {
                 refs.Dice = BuildDiceRow(safe, controller);
@@ -70,6 +71,8 @@ namespace Yahtzee.Presentation
             BuildMenuPanel(menuPanel, controller);
             BuildGameOver(safe, controller, out var gameOverPanel, out var gameOverText);
 
+            refs.Screens = ScreensBuilder.Build(safe, controller);
+
             refs.Hud = safe.gameObject.AddComponent<HudView>();
             refs.Hud.Init(rollButton, rollLabel, rollPips, status, header, gameOverPanel, gameOverText,
                 skipOverlay, menuButton, menuPanel);
@@ -80,29 +83,42 @@ namespace Yahtzee.Presentation
 
         /// <summary>Top strip: round and running totals on a solid bar, with everything that is
         /// not part of playing a turn tucked behind a hamburger.</summary>
-        private static void BuildHeaderAndStatus(RectTransform parent, out TextMeshProUGUI header,
+        private static void BuildHeaderAndStatus(RectTransform parent, GameController controller, out TextMeshProUGUI header,
             out TextMeshProUGUI status, out Button menuButton, out GameObject menuPanel)
         {
             // A solid bar, not a scrim: the kitchen wall behind Oma is pale, and cream-on-plaster
             // washed the round/score line out completely once the room went in.
-            // The status line lives INSIDE the bar. Left loose over the room it sat across the
-            // window and a wall sampler, and gold-on-plaster was barely readable.
-            var bar = Image(parent, "TopBar", new Vector2(0f, 0.876f), new Vector2(1f, 1f), UiPalette.BarDeep);
-            bar.raycastTarget = false;
+            var bar = Rect(parent, "TopBar", new Vector2(0f, 0.876f), new Vector2(1f, 1f));
 
-            header = Text(bar.rectTransform, "Header", "", 42f, UiPalette.Cream, TextAlignmentOptions.MidlineLeft,
-                new Vector2(0.04f, 0.42f), new Vector2(0.82f, 1f));
+            // Backing overflows the bar upward so it also covers the notch strip between the
+            // safe area and the true top of the screen — otherwise a band of kitchen shows
+            // above it, and the bar's own contents (which sit inside the safe area) spill below
+            // a backing anchored to the screen. Overflowing one rect solves both ends.
+            var backing = Image(bar, "Backing", Vector2.zero, Vector2.one, UiPalette.BarDeep);
+            backing.raycastTarget = false;
+            backing.rectTransform.offsetMax = new Vector2(0f, 260f);
+            backing.transform.SetAsFirstSibling();
+
+            // Scores span the full width up to the hamburger — cramped in the middle they were
+            // being clipped by the camera cutout.
+            header = Text(bar, "Header", "", 44f, UiPalette.Cream, TextAlignmentOptions.Center,
+                new Vector2(0.03f, 0.40f), new Vector2(0.84f, 1f));
             header.fontStyle = FontStyles.Bold;
 
-            var menuBg = Image(parent, "MenuButton", new Vector2(0.855f, 0.94f), new Vector2(0.985f, 0.995f), UiPalette.BarLight);
+            var menuBg = Image(bar, "MenuButton", new Vector2(0.855f, 0.42f), new Vector2(0.985f, 0.98f), UiPalette.BarLight);
             menuButton = menuBg.gameObject.AddComponent<Button>();
             menuButton.targetGraphic = menuBg;
+            menuButton.onClick.AddListener(controller.OnMenuTapped);
             Text(menuBg.rectTransform, "Glyph", "≡", 54f, UiPalette.Cream, TextAlignmentOptions.Center,
                 Vector2.zero, Vector2.one).fontStyle = FontStyles.Bold;
 
-            status = Text(bar.rectTransform, "Status", "", 32f, UiPalette.Gold, TextAlignmentOptions.Center,
-                new Vector2(0.03f, 0.02f), new Vector2(0.97f, 0.42f));
+            // Second line is the round. The old per-roll chatter ("Roll 2 of 3 done - tap dice to
+            // keep...") is gone: the pips already show the rolls, and the taps are on the table.
+            // It still yields to anything genuinely important — Joker rules, Oma's turn, toasts.
+            status = Text(bar, "Status", "", 32f, UiPalette.Gold, TextAlignmentOptions.Center,
+                new Vector2(0.03f, 0.02f), new Vector2(0.97f, 0.40f));
 
+            // The hamburger opens the full Home screen now; this panel is retired.
             menuPanel = Rect(parent, "MenuPanel", new Vector2(0.52f, 0.64f), new Vector2(0.985f, 0.872f)).gameObject;
             menuPanel.SetActive(false);
         }
@@ -199,16 +215,32 @@ namespace Yahtzee.Presentation
                 new Vector2(0.06f, 0f), new Vector2(0.62f, 1f));
             rollLabel.fontStyle = FontStyles.Bold;
 
-            // Three squares rather than glyphs in the label: drawn pips are legible at a glance
-            // and cannot fall foul of a font missing the character.
+            // Three boxes that tick off left to right as the rolls are spent, like crossing them
+            // off on paper. Drawn boxes rather than glyphs in the label, so no font can be
+            // missing the character; the tick itself is a child label toggled by HudView.
             pips = new Image[3];
             for (int i = 0; i < pips.Length; i++)
             {
                 float x0 = 0.66f + i * 0.10f;
-                pips[i] = Image(rollBg.rectTransform, $"Pip{i}", new Vector2(x0, 0.30f), new Vector2(x0 + 0.075f, 0.70f),
-                    UiPalette.Ink);
+                pips[i] = Image(rollBg.rectTransform, $"Pip{i}", new Vector2(x0, 0.28f), new Vector2(x0 + 0.078f, 0.72f),
+                    UiPalette.GoldDark);
                 pips[i].raycastTarget = false;
+                AddTick(pips[i].rectTransform);
             }
+        }
+
+        /// <summary>A tick drawn from two rotated bars. The obvious "✓" is not an option: the
+        /// default TMP font has no glyph for it and it rendered as a tofu box on device.</summary>
+        private static void AddTick(RectTransform pip)
+        {
+            var tick = Rect(pip, "Tick", Vector2.zero, Vector2.one);
+            var shortArm = Image(tick, "Short", new Vector2(0.12f, 0.34f), new Vector2(0.52f, 0.52f), UiPalette.Ink);
+            shortArm.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -45f);
+            shortArm.raycastTarget = false;
+            var longArm = Image(tick, "Long", new Vector2(0.30f, 0.30f), new Vector2(0.90f, 0.48f), UiPalette.Ink);
+            longArm.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 45f);
+            longArm.raycastTarget = false;
+            tick.gameObject.SetActive(false);
         }
 
         /// <summary>Oma's speech bubble, sitting under her in the top zone (design §5.2). Nothing

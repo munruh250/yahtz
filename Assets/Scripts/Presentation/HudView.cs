@@ -26,7 +26,7 @@ namespace Yahtzee.Presentation
         {
             _rollPips = rollPips;
             _menuPanel = menuPanel;
-            menuButton.onClick.AddListener(ToggleMenu);
+
             _rollButton = rollButton;
             _rollLabel = rollLabel;
             _status = status;
@@ -42,17 +42,18 @@ namespace Yahtzee.Presentation
         /// Skip (design §4); the peek toggle sits above it and stays tappable.</summary>
         public void SetOmaTurn(bool omaTurn) => _skipOverlay.SetActive(omaTurn);
 
-        public void SetRoll(bool enabled, int rollsRemaining)
+        /// <summary>Boxes tick off left to right as the rolls are used up.</summary>
+        public void SetRoll(bool enabled, int rollsUsed)
         {
             _rollButton.interactable = enabled;
             _rollLabel.text = "ROLL";
-            // Filled squares = rolls left this turn.
             for (int i = 0; i < _rollPips.Length; i++)
-                _rollPips[i].color = i < rollsRemaining ? UiPalette.Ink : UiPalette.GoldDark;
+            {
+                bool used = i < rollsUsed;
+                _rollPips[i].color = used ? UiPalette.GoldSoft : UiPalette.GoldDark;
+                _rollPips[i].transform.GetChild(0).gameObject.SetActive(used);
+            }
         }
-
-        /// <summary>The hamburger holds everything that is not part of playing a turn.</summary>
-        public void ToggleMenu() => _menuPanel.SetActive(!_menuPanel.activeSelf);
 
         public void CloseMenu() => _menuPanel.SetActive(false);
 
@@ -60,7 +61,9 @@ namespace Yahtzee.Presentation
 
         public void SetHeader(GameState state)
         {
-            _header.text = $"Round {state.Round}/{GameState.TotalRounds}    You {state.PlayerCard.Total}  -  Oma {state.OmaCard.Total}";
+            // Round moved to the line below; this one is the scoreline, spread wide so the
+            // camera cutout cannot clip it.
+            _header.text = $"You  {state.PlayerCard.Total}      Oma  {state.OmaCard.Total}";
         }
 
         public void ShowGameOver(GameEnded ended)
