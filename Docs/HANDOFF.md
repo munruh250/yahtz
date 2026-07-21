@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-07-20
 **Status:** M1–M3 complete, **M4 ~75%**. The game is fully playable end-to-end in the 3D kitchen scene vs. an auto-playing Oma, and the scorecard is now a physical object on the table.
-**Test baseline (must stay green):** EditMode **94**, PlayMode **13**.
+**Test baseline (must stay green):** EditMode **94**, PlayMode **15**. Run them with `Tools\run-tests.ps1` — no need to close the editor.
 **Next task:** M4 finish — see [What's left](#whats-left), item 1 (cup pour).
 
 ---
@@ -25,9 +25,21 @@ C:\Program Files\Unity\Hub\Editor\2022.3.62f3-x86_64\Editor\Unity.exe
 
 Worth repairing via Unity Hub eventually; not blocking.
 
-**Unity allows one instance per project.** Headless runs fail with `HandleProjectAlreadyOpenInAnotherInstance` while the editor is open. Check with `Get-Process Unity` before batch runs; if the owner has the editor open, either ask them to close it or hand them the menu-item equivalent.
+**Android Build Support is NOT installed** — the editor has only `windowsstandalonesupport`, so Build Settings won't offer Android at all. Before the device build (M4 item 3): Unity Hub → Installs → gear on the **`-x86_64`** install → Add Modules → Android Build Support + SDK & NDK Tools + OpenJDK. A real Pixel over USB beats an emulator here — touch, 60 fps and safe-area all need real hardware.
 
-### Headless commands
+### Running tests without closing the editor
+
+**Unity allows one instance per project path**, so a headless run against the working copy dies with `HandleProjectAlreadyOpenInAnotherInstance` whenever the editor is open. Don't ask the owner to close it — use the testbed:
+
+```powershell
+Tools\run-tests.ps1                                     # PlayMode (~100s, dice soak dominates)
+Tools\run-tests.ps1 -Platform EditMode                  # EditMode
+Tools\run-tests.ps1 -Filter Yahtzee.Tests.DiceTapTests  # one fixture
+```
+
+It mirrors `Assets`/`Packages`/`ProjectSettings` to **`C:\yz-test`** and runs there, printing the pass/fail tally, any failure messages and each test's own output. `Library` is not mirrored (it regenerates; copying a live one risks a torn state), so the first run after a wipe is slow and later ones are normal speed. Framing PNGs land under the testbed's persistent data path.
+
+### Headless commands (direct — needs the editor closed)
 
 ```powershell
 $u = "C:\Program Files\Unity\Hub\Editor\2022.3.62f3-x86_64\Editor\Unity.exe"
@@ -94,7 +106,9 @@ Results XML parses with `[xml]$r = Get-Content out.xml; $r."test-run"` → `tota
 ### Tests
 
 - **EditMode (94)** — exhaustive 7,776-combination scoring sweep vs. a naive oracle, scorecard bonus edges (62/63/64), every Joker branch, engine legality/turn-flow/events with scripted RNG, 200-seed headless games with event-rebuilt totals, save round-trip + resume determinism, 6 AI tests (determinism, query-purity, made-hand keeps, Joker legality, box protection, 1000-game strength band).
-- **PlayMode (13)** — `GameFlowPlayModeTests` (full game vs. auto-Oma, one-box-per-turn, skip under real pacing, save/reload resume, illegal-tap no-ops, 2D-layer regression) · `DiceSoakTests` (**1,000 rolls × 5 dice all rest on engine values, inside the roll zone**, mid-tumble skip) · `FramingCaptureTests` (renders each framing to PNG) · `WorldScorecardTests` (card is world-space + raycastable, rests on the table clear of the dice, fully visible and ≥64 px per box in every scoring framing, and **no die is ever hidden behind it**).
+- **PlayMode (15)** — `GameFlowPlayModeTests` (full game vs. auto-Oma, one-box-per-turn, skip under real pacing, save/reload resume, illegal-tap no-ops, 2D-layer regression) · `DiceSoakTests` (**1,000 rolls × 5 dice all rest on engine values, inside the roll zone**, mid-tumble skip) · `FramingCaptureTests` (renders each framing to PNG) · `WorldScorecardTests` (card is world-space + raycastable, rests on the table clear of the dice, fully visible and ≥64 px per box in every scoring framing, and **no die is ever hidden behind it**) · `DiceTapTests` (tapping a die picks *that* die from every framing, and keep/release round-trips).
+
+**Mind the gap between "the controller works" and "the player can do it."** Every other PlayMode test drives `GameController.OnDieTapped` directly, so for the whole of M4 the suite was green while tap-to-keep was impossible to actually perform — the fence collider sat between the camera and the dice and swallowed the pick. `DiceTapTests` closes that specific gap; the same blind spot still exists for **scorecard cell taps**, which no test drives through the GraphicRaycaster.
 
 **`FramingCaptureTests` is a reusable design tool**, not just a test: it writes `AppData\LocalLow\DefaultCompany\yahtzee\framings\*.png` headless. That's how the camera was matched to the owner's concept mockup — re-run it after any scene/camera/art change and actually look at the output. `WorldScorecardTests` is the numeric half of the same loop: it catches "the card drifted off screen / got too small", which a render alone makes easy to eyeball past.
 
@@ -135,7 +149,7 @@ Results XML parses with `[xml]$r = Get-Content out.xml; $r."test-run"` → `tota
 
 1. **Cup pour** — dice currently spawn beside the cup. They should launch from inside it with a tip/pour animation (`KitchenBuilder.CupPosition`, `DiceView3D.PlayRoll`). Note the launch point had to move *inside* the fence when the roll zone tightened; the cup **prop** still sits outside it at x = 0.46, so this needs the prop moved (or the zone widened) rather than just re-pointing the spawn.
 2. **Real art pass** — swap gray-box primitives for the low-poly kitchen; **Oma is a purple-tinted placeholder mannequin** right now. Note: her FBX import extracted real textures (`Assets/Resources/Oma/Ch36_*.png`) that are currently unused — wiring those up is a quick interim improvement over the purple tint. The scorecard also still reads as a dark UI panel rather than paper (unlit UI shader, `UiPalette.Panel` border) — worth a pass here. Re-run `FramingCaptureTests` after any art change.
-3. **Android device build** — 60 fps check, touch input pass, safe-area on a real notch. This is also the outstanding **M2 exit criterion** ("playable on device build" was only ever verified in-editor). Don't let it slip past M4. Note the world-space card's tap targets have only ever been exercised through `GameController` in tests — **actually tapping boxes on a device is unverified** and is the first thing to check.
+3. **Android device build** — 60 fps check, touch input pass, safe-area on a real notch. This is also the outstanding **M2 exit criterion** ("playable on device build" was only ever verified in-editor). Don't let it slip past M4. **Install Android Build Support first** (see §2). The world-space card's tap targets have only ever been exercised through `GameController`, so **actually tapping score boxes is unverified** — first thing to check on device, and the same class of bug as the dice-tap one that survived all of M4.
 
 ### M5 — Oma lives (not started)
 

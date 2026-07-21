@@ -19,6 +19,9 @@ namespace Yahtzee.Presentation
         private Vector3[] _keepSlots;
         private Transform[] _keepMarkers;
         private bool _interactable;
+
+        /// <summary>Ray length for tap picking — the seated framings sit ~2.5 m from the table.</summary>
+        private const float PickDistance = 8f;
         private Action _pendingSettled;
         private readonly bool[] _placedKept = new bool[5];
         private System.Random _throwRng = new System.Random();
@@ -122,14 +125,34 @@ namespace Yahtzee.Presentation
 
             if (_interactable && Input.GetMouseButtonDown(0) && !IsPointerOverUi())
             {
-                var ray = _camera.ScreenPointToRay(Input.mousePosition);
-                if (Physics.Raycast(ray, out var hit, 5f))
-                {
-                    var die = hit.collider.GetComponent<Die3D>();
-                    if (die != null)
-                        _controller.OnDieTapped(die.Index);
-                }
+                var die = DieAtScreenPoint(Input.mousePosition);
+                if (die != null)
+                    _controller.OnDieTapped(die.Index);
             }
+        }
+
+        /// <summary>The die under a screen point, or null if the tap missed one.
+        ///
+        /// Must consider every hit along the ray, not just the first: the invisible fence stands
+        /// between the camera and the table, so a first-hit raycast reports a wall and the tap is
+        /// silently swallowed. That bug made unkept dice untappable while kept ones — parked in
+        /// front of the near wall — still worked.
+        ///
+        /// Public so tests can exercise the pick path without synthesising input events.</summary>
+        public Die3D DieAtScreenPoint(Vector3 screenPoint)
+        {
+            var hits = Physics.RaycastAll(_camera.ScreenPointToRay(screenPoint), PickDistance);
+            Die3D nearest = null;
+            float nearestDistance = float.MaxValue;
+            foreach (var hit in hits)
+            {
+                var die = hit.collider.GetComponent<Die3D>();
+                if (die == null || hit.distance >= nearestDistance)
+                    continue;
+                nearestDistance = hit.distance;
+                nearest = die;
+            }
+            return nearest;
         }
 
         private void FireSettledIfDone()
@@ -144,8 +167,17 @@ namespace Yahtzee.Presentation
             settled();
         }
 
-        private static bool IsPointerOverUi() =>
-            EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+        /// <summary>Don't steal a tap that landed on the scorecard or the action bar. The no-arg
+        /// overload only tracks the mouse pointer, so on a touch device it always reports false
+        /// and taps would fall through to the dice — hence the explicit finger id.</summary>
+        private static bool IsPointerOverUi()
+        {
+            if (EventSystem.current == null)
+                return false;
+            return Input.touchCount > 0
+                ? EventSystem.current.IsPointerOverGameObject(Input.GetTouch(0).fingerId)
+                : EventSystem.current.IsPointerOverGameObject();
+        }
 
         private float Rnd(float min, float max) => (float)(_throwRng.NextDouble() * (max - min) + min);
 
