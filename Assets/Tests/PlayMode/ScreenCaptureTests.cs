@@ -75,6 +75,18 @@ namespace Yahtzee.Tests
             yield return null;
             Capture("screen-ingame");
 
+            // Game over is the one panel no other capture reaches, and it is styled from the
+            // same palette as everything else — so it is exactly where a rename goes unnoticed.
+            var hud = Object.FindAnyObjectByType<HudView>();
+            hud.ShowGameOver(new Yahtzee.Core.GameEnded
+            {
+                PlayerTotal = 214,
+                OmaTotal = 198,
+                Result = Yahtzee.Core.GameResult.PlayerWins,
+            });
+            yield return null;
+            Capture("screen-gameover");
+
             Assert.IsTrue(File.Exists(Path.Combine(OutDir, "screen-ingame.png")));
         }
 
