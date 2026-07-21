@@ -21,8 +21,27 @@ namespace Yahtzee.Presentation
 
         private const float DieSize = 0.09f;
         private const float TableY = 0f;
-        // Dice pour in from beside the (visual) cup on the right of the oval.
-        private static readonly Vector3 CupPosition = new Vector3(0.30f, 0.30f, 0.24f);
+
+        // ---- Play zones -------------------------------------------------------
+        // Rolled dice are penned into a compact patch in the middle of the table: values stay
+        // easy to track, and nothing ever wanders behind the scorecard. Kept dice line up in a
+        // row in front of it. Both zones sit clear of the card, which is propped 24 degrees and
+        // hides anything on the table behind roughly z = -0.245 from the seated framings.
+
+        /// <summary>Inner faces of the fence — the patch rolled dice must come to rest in.</summary>
+        public const float RollZoneHalfX = 0.31f;
+        public const float RollZoneMinZ = 0.10f;
+        public const float RollZoneMaxZ = 0.38f;
+        /// <summary>Kept dice line up here, between the roll zone and the card. The card's raised
+        /// top edge hides table level behind about z = -0.19 at the tightest framing, so the row
+        /// sits well forward of that — the gold pads are wider than the dice and clip first.</summary>
+        public const float KeepRowZ = -0.05f;
+        private const float SlotSpacingX = 0.12f;
+        private static float RollZoneCenterZ => (RollZoneMinZ + RollZoneMaxZ) / 2f;
+
+        // Dice pour in from beside the (visual) cup, but inside the fence — outside it they
+        // would land on the wrong side of a wall and never reach the table.
+        private static readonly Vector3 CupPosition = new Vector3(0.26f, 0.30f, 0.27f);
 
         public static Refs Build(Transform parent, GameController controller, Camera camera)
         {
@@ -154,12 +173,16 @@ namespace Yahtzee.Presentation
 
         private static void BuildFence(Transform root)
         {
-            // Invisible walls + ceiling keep dice inside the playable oval (TECH_PLAN §5.4).
-            AddWall(root, "FenceLeft", new Vector3(-0.55f, 0.15f, 0.05f), new Vector3(0.02f, 0.5f, 0.85f));
-            AddWall(root, "FenceRight", new Vector3(0.55f, 0.15f, 0.05f), new Vector3(0.02f, 0.5f, 0.85f));
-            AddWall(root, "FenceFar", new Vector3(0f, 0.15f, 0.50f), new Vector3(1.15f, 0.5f, 0.02f));
-            AddWall(root, "FenceNear", new Vector3(0f, 0.15f, -0.38f), new Vector3(1.15f, 0.5f, 0.02f));
-            AddWall(root, "FenceCeiling", new Vector3(0f, 0.42f, 0.05f), new Vector3(1.15f, 0.02f, 0.9f));
+            // Invisible walls + ceiling pen the dice into the roll zone (TECH_PLAN §5.4). Walls
+            // are centred half a thickness outside the zone so their inner faces are the bounds.
+            const float t = 0.02f;
+            float width = RollZoneHalfX * 2f + t;
+            float depth = RollZoneMaxZ - RollZoneMinZ;
+            AddWall(root, "FenceLeft", new Vector3(-RollZoneHalfX - t / 2f, 0.15f, RollZoneCenterZ), new Vector3(t, 0.5f, depth));
+            AddWall(root, "FenceRight", new Vector3(RollZoneHalfX + t / 2f, 0.15f, RollZoneCenterZ), new Vector3(t, 0.5f, depth));
+            AddWall(root, "FenceFar", new Vector3(0f, 0.15f, RollZoneMaxZ + t / 2f), new Vector3(width, 0.5f, t));
+            AddWall(root, "FenceNear", new Vector3(0f, 0.15f, RollZoneMinZ - t / 2f), new Vector3(width, 0.5f, t));
+            AddWall(root, "FenceCeiling", new Vector3(0f, 0.42f, RollZoneCenterZ), new Vector3(width, t, depth));
         }
 
         private static void AddWall(Transform root, string name, Vector3 center, Vector3 size)
@@ -200,13 +223,15 @@ namespace Yahtzee.Presentation
             var dice = new Die3D[DiceState.DieCount];
             var restSlots = new Vector3[DiceState.DieCount];
             var keepSlots = new Vector3[DiceState.DieCount];
+            var keepMarkers = new Transform[DiceState.DieCount];
             var faceMat = Mat(UiPalette.DieFace);
 
             for (int i = 0; i < DiceState.DieCount; i++)
             {
-                float x = (i - 2) * 0.14f;
-                restSlots[i] = new Vector3(x, TableY + DieSize / 2f, 0.10f);
-                keepSlots[i] = new Vector3(x, TableY + DieSize / 2f, -0.30f);
+                float x = (i - 2) * SlotSpacingX;
+                restSlots[i] = new Vector3(x, TableY + DieSize / 2f, RollZoneCenterZ);
+                keepSlots[i] = new Vector3(x, TableY + DieSize / 2f, KeepRowZ);
+                keepMarkers[i] = BuildKeepMarker(root, i, keepSlots[i]);
 
                 var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 go.name = $"Die{i}";
@@ -229,8 +254,24 @@ namespace Yahtzee.Presentation
                 dice[i] = die;
             }
 
-            view.Init(dice, camera, controller, CupPosition, restSlots, keepSlots);
+            view.Init(dice, camera, controller, CupPosition, restSlots, keepSlots, keepMarkers);
             return view;
+        }
+
+        /// <summary>Gold pad a kept die sits on. Design §5.5 forbids colour-only signalling, so
+        /// "kept" reads twice over: the die moves to the keep row AND lands on a marked spot.</summary>
+        private static Transform BuildKeepMarker(Transform root, int index, Vector3 slot)
+        {
+            var marker = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            marker.name = $"KeepMarker{index}";
+            marker.transform.SetParent(root, false);
+            // Wide enough to read past the die's corners (its half-diagonal is ~0.064).
+            marker.transform.localPosition = new Vector3(slot.x, TableY + 0.002f, slot.z);
+            marker.transform.localScale = new Vector3(0.17f, 0.002f, 0.17f);
+            marker.GetComponent<Renderer>().material = Mat(UiPalette.Gold);
+            Object.Destroy(marker.GetComponent<Collider>()); // never blocks a die tap
+            marker.SetActive(false);
+            return marker.transform;
         }
 
         /// <summary>Quad pips on each face so values read at a glance even gray-boxed.</summary>

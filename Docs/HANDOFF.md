@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-07-20
 **Status:** M1–M3 complete, **M4 ~75%**. The game is fully playable end-to-end in the 3D kitchen scene vs. an auto-playing Oma, and the scorecard is now a physical object on the table.
-**Test baseline (must stay green):** EditMode **94**, PlayMode **12**.
+**Test baseline (must stay green):** EditMode **94**, PlayMode **13**.
 **Next task:** M4 finish — see [What's left](#whats-left), item 1 (cup pour).
 
 ---
@@ -74,7 +74,7 @@ Results XML parses with `[xml]$r = Get-Content out.xml; $r."test-run"` → `tota
 
 - **`GameController`** — owns engine, subscribes to events, sequences everything. Input entry points: `OnRollTapped`, `OnDieTapped`, `OnCellTapped`, `OnSkipTapped`, `OnPeekTapped`, `OnNewGameTapped`. Two static flags: **`AnimationsEnabled`** (tests set false → everything instant) and **`Use3dDice`** (false → the 2D layer, kept per TECH_PLAN §7).
 - **`IDiceView`** — `SetDice` / `PlayRoll` / `SetInteractable` / `SkipAnimation`. Two implementations:
-  - `DiceView3D` + `Die3D` — physics dice, **engine value decided first**, guided settle, watchdog snap, raycast tap-to-keep.
+  - `DiceView3D` + `Die3D` — physics dice, **engine value decided first**, guided settle, watchdog snap, raycast tap-to-keep. Kept dice move to the keep row *and* light a gold pad (design §5.5 forbids colour-only signalling); rolled dice are penned into the roll zone so values stay trackable.
   - `DiceView2D` + `DieView2D` — sprite fallback behind the debug flag.
 - **`KitchenBuilder`** — builds the whole gray-box scene in code (table, fence, lamp + fill light, props, dice, the diegetic scorecard, Oma, camera framings). Real art replaces primitives here.
 - **`CameraDirector`** — 4 framings (Default / DiceFocus / ScorecardFocus / OmaFocus), 0.5 s eased blends.
@@ -82,7 +82,10 @@ Results XML parses with `[xml]$r = Get-Content out.xml; $r."test-run"` → `tota
 - **`ScorecardBuilder`** — the one grid builder for both layers. `BuildInto(rect, …)` fills any RectTransform with the 13 boxes + title + bonus row; `BuildWorld(…)` wraps that in a **world-space canvas** lying on the table, propped 24° at the player, on a backing board. Card geometry (size, tilt, z) is a block of named constants at the top of the file — tune there, then re-run the framing renders.
 - **`UiBuilder`** — screen-space uGUI built in code. With `worldDice: true` it keeps only the non-diegetic strip (header, status, action bar, peek, overlays); background, 2D dice row and scorecard all drop away. **`ScorecardView`/`ScoreCellView`** (ghosts, two-tap confirm, Joker dimming, gold hint highlights, bonus bar) are shared verbatim by both layers, **`HudView`** (roll pips, status, totals, skip overlay, peek button, game-over panel), `SafeAreaFitter`, `UiPalette`.
 
-**The constraint the diegetic card creates:** the player may score from any framing the camera *rests* in, so those framings must show all 13 boxes, clear of the action bar, at ≥64 px per box (design §5.5). Portrait is tight — the frustum is only ~25° wide, so card width is the binding limit and tilt is what buys legibility. `WorldScorecardTests` asserts this and prints the measured spans, so retuning is reading numbers off a test run rather than guessing.
+**Two constraints the diegetic card creates.** Both are asserted by `WorldScorecardTests`, which also prints measured spans so retuning is reading numbers off a test run rather than guessing.
+
+1. **Every framing the camera *rests* in during Deciding must show all 13 boxes**, clear of the action bar, at ≥64 px per box (design §5.5) — the player can score from any of them. Portrait is tight: the frustum is only ~25° wide, so card *width* is the binding limit and *tilt* is what buys legibility.
+2. **The card is propped, so it occludes the table behind it.** Its raised top edge hides table level behind roughly z = −0.19 at the tightest framing. Anything the player must see — dice above all — has to live in front of that line. This is why `KitchenBuilder` has explicit `RollZoneMinZ/MaxZ/HalfX` and `KeepRowZ` constants instead of scattered magic numbers: the fence, the dice slots and the keep row are all derived from them. It is also a bug that already shipped once — the keep row sat at z = −0.30, so kept dice (yours and Oma's) were invisible.
 
 ### Editor tools (`Assets/Editor`) — all idempotent, all under the `Yahtzee/` menu
 
@@ -91,7 +94,7 @@ Results XML parses with `[xml]$r = Get-Content out.xml; $r."test-run"` → `tota
 ### Tests
 
 - **EditMode (94)** — exhaustive 7,776-combination scoring sweep vs. a naive oracle, scorecard bonus edges (62/63/64), every Joker branch, engine legality/turn-flow/events with scripted RNG, 200-seed headless games with event-rebuilt totals, save round-trip + resume determinism, 6 AI tests (determinism, query-purity, made-hand keeps, Joker legality, box protection, 1000-game strength band).
-- **PlayMode (12)** — `GameFlowPlayModeTests` (full game vs. auto-Oma, one-box-per-turn, skip under real pacing, save/reload resume, illegal-tap no-ops, 2D-layer regression) · `DiceSoakTests` (**1,000 rolls × 5 dice all rest on engine values**, mid-tumble skip) · `FramingCaptureTests` (renders each framing to PNG) · `WorldScorecardTests` (card is world-space + raycastable, rests on the table clear of the dice, fully visible and ≥64 px per box in every scoring framing).
+- **PlayMode (13)** — `GameFlowPlayModeTests` (full game vs. auto-Oma, one-box-per-turn, skip under real pacing, save/reload resume, illegal-tap no-ops, 2D-layer regression) · `DiceSoakTests` (**1,000 rolls × 5 dice all rest on engine values, inside the roll zone**, mid-tumble skip) · `FramingCaptureTests` (renders each framing to PNG) · `WorldScorecardTests` (card is world-space + raycastable, rests on the table clear of the dice, fully visible and ≥64 px per box in every scoring framing, and **no die is ever hidden behind it**).
 
 **`FramingCaptureTests` is a reusable design tool**, not just a test: it writes `AppData\LocalLow\DefaultCompany\yahtzee\framings\*.png` headless. That's how the camera was matched to the owner's concept mockup — re-run it after any scene/camera/art change and actually look at the output. `WorldScorecardTests` is the numeric half of the same loop: it catches "the card drifted off screen / got too small", which a render alone makes easy to eyeball past.
 
@@ -130,7 +133,7 @@ Results XML parses with `[xml]$r = Get-Content out.xml; $r."test-run"` → `tota
 
 ### M4 finish (current milestone)
 
-1. **Cup pour** — dice currently spawn beside the cup. They should launch from inside it with a tip/pour animation (`KitchenBuilder.CupPosition`, `DiceView3D.PlayRoll`).
+1. **Cup pour** — dice currently spawn beside the cup. They should launch from inside it with a tip/pour animation (`KitchenBuilder.CupPosition`, `DiceView3D.PlayRoll`). Note the launch point had to move *inside* the fence when the roll zone tightened; the cup **prop** still sits outside it at x = 0.46, so this needs the prop moved (or the zone widened) rather than just re-pointing the spawn.
 2. **Real art pass** — swap gray-box primitives for the low-poly kitchen; **Oma is a purple-tinted placeholder mannequin** right now. Note: her FBX import extracted real textures (`Assets/Resources/Oma/Ch36_*.png`) that are currently unused — wiring those up is a quick interim improvement over the purple tint. The scorecard also still reads as a dark UI panel rather than paper (unlit UI shader, `UiPalette.Panel` border) — worth a pass here. Re-run `FramingCaptureTests` after any art change.
 3. **Android device build** — 60 fps check, touch input pass, safe-area on a real notch. This is also the outstanding **M2 exit criterion** ("playable on device build" was only ever verified in-editor). Don't let it slip past M4. Note the world-space card's tap targets have only ever been exercised through `GameController` in tests — **actually tapping boxes on a device is unverified** and is the first thing to check.
 

@@ -377,7 +377,7 @@ namespace Yahtzee.Presentation
                     ? "Joker rules! +100 bonus - you must use a highlighted box"
                     : "Joker rules! You must use a highlighted box";
             if (Engine.RollsRemaining > 0)
-                return $"{toast}Roll {state.Dice.RollsUsed} of 3 done - keep dice, roll again, or score";
+                return $"{toast}Roll {state.Dice.RollsUsed} of 3 done - tap dice to keep, roll again, or score";
             return suggested != null && suggested.Count > 0 && potentials != null
                 ? $"{toast}No rolls left - best: {UiBuilder.DisplayName(suggested[0])} for {potentials[suggested[0]]}"
                 : $"{toast}Choose a score";

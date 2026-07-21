@@ -17,6 +17,7 @@ namespace Yahtzee.Presentation
         private Vector3 _cupPosition;
         private Vector3[] _restSlots;
         private Vector3[] _keepSlots;
+        private Transform[] _keepMarkers;
         private bool _interactable;
         private Action _pendingSettled;
         private readonly bool[] _placedKept = new bool[5];
@@ -25,7 +26,7 @@ namespace Yahtzee.Presentation
         public Die3D[] Dice => _dice;
 
         public void Init(Die3D[] dice, Camera camera, GameController controller,
-            Vector3 cupPosition, Vector3[] restSlots, Vector3[] keepSlots)
+            Vector3 cupPosition, Vector3[] restSlots, Vector3[] keepSlots, Transform[] keepMarkers)
         {
             _dice = dice;
             _camera = camera;
@@ -33,6 +34,7 @@ namespace Yahtzee.Presentation
             _cupPosition = cupPosition;
             _restSlots = restSlots;
             _keepSlots = keepSlots;
+            _keepMarkers = keepMarkers;
         }
 
         // ---- IDiceView -------------------------------------------------------
@@ -43,6 +45,7 @@ namespace Yahtzee.Presentation
             {
                 var die = _dice[i];
                 bool visible = values[i] >= 1 && values[i] <= 6;
+                ShowKeepMarker(i, visible && kept[i]);
                 if (!visible)
                 {
                     die.gameObject.SetActive(false);
@@ -76,6 +79,7 @@ namespace Yahtzee.Presentation
             for (int i = 0; i < _dice.Length; i++)
             {
                 _dice[i].gameObject.SetActive(true);
+                ShowKeepMarker(i, kept[i]);
                 if (kept[i])
                 {
                     _dice[i].PlaceAt(_keepSlots[i], values[i], DeterministicYaw(i, values[i]));
@@ -83,17 +87,22 @@ namespace Yahtzee.Presentation
                     continue;
                 }
                 _placedKept[i] = false;
-                // Randomized pour toward the table center; guidance handles the rest.
+                // Randomized pour toward the table center; guidance handles the rest. Kept
+                // deliberately gentle: in the tight roll zone a harder throw just pinballs off
+                // the walls, and values that skitter around are hard to read.
                 var from = _cupPosition + new Vector3(Rnd(-0.03f, 0.03f), Rnd(0f, 0.05f), Rnd(-0.03f, 0.03f));
                 var target = _restSlots[i];
                 var flat = new Vector3(target.x - from.x, 0f, target.z - from.z);
-                var velocity = flat * Rnd(2.1f, 2.9f) + Vector3.up * Rnd(0.4f, 0.9f);
-                var spin = new Vector3(Rnd(-18f, 18f), Rnd(-18f, 18f), Rnd(-18f, 18f));
+                var velocity = flat * Rnd(1.4f, 1.9f) + Vector3.up * Rnd(0.20f, 0.40f);
+                var spin = new Vector3(Rnd(-12f, 12f), Rnd(-12f, 12f), Rnd(-12f, 12f));
                 _dice[i].LaunchRoll(values[i], from, velocity, spin);
             }
         }
 
         public void SetInteractable(bool interactable) => _interactable = interactable;
+
+        /// <summary>The gold pad under a kept die — the visible half of "this one is staying".</summary>
+        private void ShowKeepMarker(int index, bool visible) => _keepMarkers[index].gameObject.SetActive(visible);
 
         public void SkipAnimation()
         {

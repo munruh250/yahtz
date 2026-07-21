@@ -124,6 +124,77 @@ namespace Yahtzee.Tests
             }
         }
 
+        /// <summary>The card is propped toward the player, so it occludes the table behind it —
+        /// which silently hid the keep row when the card first landed. Rolled and kept dice alike
+        /// must stay visible over its top edge from every framing the player reads dice in.</summary>
+        [UnityTest]
+        public IEnumerator Dice_AreNeverHiddenBehindTheCard()
+        {
+            yield return LoadGameScene();
+            var camera = Camera.main;
+            camera.aspect = ReferenceWidth / ReferenceHeight;
+            var controller = Object.FindAnyObjectByType<GameController>();
+            var director = Object.FindAnyObjectByType<CameraDirector>();
+
+            // Roll, then keep two dice so both the roll zone and the keep row are populated.
+            controller.OnRollTapped();
+            controller.OnDieTapped(0);
+            controller.OnDieTapped(1);
+            yield return null;
+
+            var dice = Object.FindObjectsByType<Die3D>(FindObjectsSortMode.None);
+            Assert.AreEqual(5, dice.Length);
+
+            var quad = new Vector2[4];
+            var corners = new Vector3[4];
+            foreach (var framing in new[]
+                     {
+                         CameraDirector.Framing.Default,
+                         CameraDirector.Framing.ScorecardFocus,
+                         CameraDirector.Framing.DiceFocus,
+                     })
+            {
+                director.Set(framing, instant: true);
+                yield return null;
+
+                ((RectTransform)FindCardCanvas().transform).GetWorldCorners(corners);
+                for (int i = 0; i < 4; i++)
+                    quad[i] = camera.WorldToViewportPoint(corners[i]);
+
+                foreach (var die in dice)
+                {
+                    // The near-bottom edge is the first thing the card's top edge eats. The
+                    // offset also covers the gold keep pad, which is wider than the die.
+                    var p = die.transform.position;
+                    var nearEdge = new Vector3(p.x, 0f, p.z - KeepPadRadius);
+                    var viewport = camera.WorldToViewportPoint(nearEdge);
+                    Assert.IsFalse(InsideQuad(viewport, quad),
+                        $"{framing}: {die.name} at {p} is hidden behind the scorecard");
+                }
+            }
+        }
+
+        /// <summary>Radius of the gold pad under a kept die (KitchenBuilder.BuildKeepMarker),
+        /// the widest thing sitting at a dice slot.</summary>
+        private const float KeepPadRadius = 0.085f;
+
+        /// <summary>Point-in-convex-quad. GetWorldCorners returns them in ring order, so a
+        /// consistent cross-product sign against every edge means the point is inside. The card
+        /// is planar and nearer the camera than the dice, so "inside" is exactly "occluded".</summary>
+        private static bool InsideQuad(Vector2 point, Vector2[] quad)
+        {
+            bool anyPositive = false, anyNegative = false;
+            for (int i = 0; i < quad.Length; i++)
+            {
+                var a = quad[i];
+                var b = quad[(i + 1) % quad.Length];
+                float cross = (b.x - a.x) * (point.y - a.y) - (b.y - a.y) * (point.x - a.x);
+                if (cross > 0f) anyPositive = true;
+                else if (cross < 0f) anyNegative = true;
+            }
+            return !(anyPositive && anyNegative);
+        }
+
         /// <summary>Prints where the card actually lands, so retuning the framings is a matter of
         /// reading numbers off a test run rather than guessing at camera geometry.</summary>
         private static void ReportSpan(CameraDirector.Framing framing, Camera camera, Vector3[] corners)

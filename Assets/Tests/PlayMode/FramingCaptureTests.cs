@@ -55,24 +55,32 @@ namespace Yahtzee.Tests
             yield return null;
             Capture("1-roll1-settled");
 
+            // Two dice kept: they move to the keep row on their gold pads, in front of the
+            // card. Check this render whenever the card or the play zones move — the keep row
+            // disappearing behind the card is exactly the kind of regression it catches.
+            controller.OnDieTapped(0);
+            controller.OnDieTapped(1);
+            yield return null;
+            Capture("2-two-dice-kept");
+
             // Burn the remaining rolls → ScorecardFocus + best-option hints active.
             controller.OnRollTapped();
             controller.OnRollTapped();
             yield return null;
-            Capture("2-roll3-scorecardfocus");
+            Capture("3-roll3-scorecardfocus");
 
             // Explicit framings for review regardless of game flow.
             director.Set(CameraDirector.Framing.Default, instant: true);
             yield return null;
-            Capture("3-default");
+            Capture("4-default");
             director.Set(CameraDirector.Framing.DiceFocus, instant: true);
             yield return null;
-            Capture("4-dicefocus");
+            Capture("5-dicefocus");
             director.Set(CameraDirector.Framing.OmaFocus, instant: true);
             yield return null;
-            Capture("5-omafocus");
+            Capture("6-omafocus");
 
-            Assert.IsTrue(File.Exists(Path.Combine(OutDir, "3-default.png")));
+            Assert.IsTrue(File.Exists(Path.Combine(OutDir, "4-default.png")));
         }
 
         private static void Capture(string name)

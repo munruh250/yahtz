@@ -11,6 +11,10 @@ namespace Yahtzee.Tests
     /// and asserts every die settles on exactly the engine-chosen face, inside the fence.</summary>
     public class DiceSoakTests
     {
+        /// <summary>Zone bounds are the fence's inner faces; a die resting against one has its
+        /// centre half a die inside, so this only absorbs momentary collider penetration.</summary>
+        private const float Slack = 0.01f;
+
         private GameObject _cameraGo;
         private KitchenBuilder.Refs _kitchen;
 
@@ -68,10 +72,15 @@ namespace Yahtzee.Tests
                     var die = kitchen.Dice.Dice[i];
                     Assert.AreEqual(values[i], die.UpFace(),
                         $"roll {roll} die {i}: rest face disagrees with engine value");
+                    // Dice must come to rest in the middle of the table, not scattered across
+                    // it: values stay easy to track and nothing strays toward the scorecard.
                     var p = die.transform.position;
                     Assert.IsTrue(
-                        Mathf.Abs(p.x) < 0.60f && p.z > -0.45f && p.z < 0.55f && p.y > -0.05f && p.y < 0.25f,
-                        $"roll {roll} die {i}: escaped the fence at {p}");
+                        Mathf.Abs(p.x) < KitchenBuilder.RollZoneHalfX + Slack
+                        && p.z > KitchenBuilder.RollZoneMinZ - Slack
+                        && p.z < KitchenBuilder.RollZoneMaxZ + Slack
+                        && p.y > -0.05f && p.y < 0.25f,
+                        $"roll {roll} die {i}: left the roll zone at {p}");
                 }
             }
         }
