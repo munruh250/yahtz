@@ -86,7 +86,7 @@ namespace Yahtzee.Presentation
             cup.transform.localPosition = new Vector3(0.46f, TableY + 0.075f, 0.30f);
             cup.transform.localScale = new Vector3(0.14f, 0.075f, 0.14f);
             cup.GetComponent<Renderer>().material = Mat(new Color(0.12f, 0.11f, 0.11f));
-            cup.GetComponent<Collider>().material = DiePhysicMaterial(); // dice may clip it
+            RemoveCollider(cup); // sits outside the fence at x=0.46; dice can never reach it
 
             var box = GameObject.CreatePrimitive(PrimitiveType.Cube);
             box.name = "GameBox";
@@ -95,7 +95,7 @@ namespace Yahtzee.Presentation
             box.transform.localRotation = Quaternion.Euler(0f, 24f, 0f);
             box.transform.localScale = new Vector3(0.34f, 0.10f, 0.24f);
             box.GetComponent<Renderer>().material = Mat(new Color(0.55f, 0.14f, 0.12f));
-            Object.Destroy(box.GetComponent<Collider>()); // outside the fence, decoration
+            RemoveCollider(box); // outside the fence, decoration
 
             var mug = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             mug.name = "OmaMug";
@@ -103,7 +103,7 @@ namespace Yahtzee.Presentation
             mug.transform.localPosition = new Vector3(-0.30f, TableY + 0.055f, 0.62f);
             mug.transform.localScale = new Vector3(0.10f, 0.055f, 0.10f);
             mug.GetComponent<Renderer>().material = Mat(new Color(0.92f, 0.90f, 0.85f));
-            Object.Destroy(mug.GetComponent<Collider>());
+            RemoveCollider(mug);
 
             var omaCard = GameObject.CreatePrimitive(PrimitiveType.Cube);
             omaCard.name = "OmaScorecardProp";
@@ -112,7 +112,7 @@ namespace Yahtzee.Presentation
             omaCard.transform.localRotation = Quaternion.Euler(0f, -6f, 0f);
             omaCard.transform.localScale = new Vector3(0.16f, 0.004f, 0.24f);
             omaCard.GetComponent<Renderer>().material = Mat(new Color(0.93f, 0.89f, 0.78f));
-            Object.Destroy(omaCard.GetComponent<Collider>());
+            RemoveCollider(omaCard);
 
             var pencil = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             pencil.name = "OmaPencil";
@@ -121,7 +121,7 @@ namespace Yahtzee.Presentation
             pencil.transform.localRotation = Quaternion.Euler(90f, 15f, 0f);
             pencil.transform.localScale = new Vector3(0.012f, 0.07f, 0.012f);
             pencil.GetComponent<Renderer>().material = Mat(new Color(0.85f, 0.65f, 0.15f));
-            Object.Destroy(pencil.GetComponent<Collider>());
+            RemoveCollider(pencil);
         }
 
         /// <summary>Instantiates the animated Oma character seated across the table (concept
@@ -318,6 +318,23 @@ namespace Yahtzee.Presentation
                     pip.transform.localScale = new Vector3(0.16f, 0.16f, 0.05f);
                 }
             }
+        }
+
+        /// <summary>Drops a primitive's collider. Props are decoration — dice are penned inside
+        /// the fence and can never touch them.
+        ///
+        /// Null-checked because a primitive's collider is NOT guaranteed to exist in a player
+        /// build. With `stripEngineCode` on (the Android default), IL2CPP strips collider types
+        /// the game never names, and nothing here names CapsuleCollider — the one Unity puts on a
+        /// Cylinder. So on device CreatePrimitive(Cylinder) came back with no collider, and
+        /// dereferencing it threw inside BuildProps, leaving the entire 3D scene, dice and
+        /// scorecard unbuilt while the screen-space UI still drew. The editor never reproduces
+        /// this: nothing is stripped there. Diagnosed off `adb logcat` (see HANDOFF §2).</summary>
+        private static void RemoveCollider(GameObject prop)
+        {
+            var collider = prop.GetComponent<Collider>();
+            if (collider != null)
+                Object.Destroy(collider);
         }
 
         private static Material Mat(Color color)

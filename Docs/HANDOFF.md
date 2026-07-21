@@ -30,6 +30,31 @@ Worth repairing via Unity Hub eventually; not blocking.
 - *"No Android devices connected"* with the phone plugged in — check `adb devices` against `Get-PnpDevice`. Windows showing the phone as class **WPD** while adb lists **nothing** means USB debugging is off (Developer options, *not* the USB-preferences menu — USB tethering is unrelated and shares mobile data instead). Serial listed as `unauthorized` instead means the on-phone RSA prompt was dismissed.
 - *"trying to install ARMv7 APK to ARM64 device"* — Unity's Android defaults are Mono + ARMv7. `SceneBootstrapper.ConfigurePlayerSettings` now forces IL2CPP + ARM64 per CLAUDE.md (ARM64 is only offered under IL2CPP, so the backend must be set first). Re-run `Yahtzee/Setup Project` if the settings ever drift back.
 
+### Build-only bugs: the suite cannot see them
+
+EditMode and PlayMode run **inside the editor**, where nothing is stripped and every shader and component type is loaded. A green suite says nothing about a device build. This has already shipped one total failure: `GameController.Awake` threw, so the entire 3D scene, dice and scorecard were absent while the screen-space UI still drew.
+
+**The trap that caused it:** with `stripEngineCode: 1` (the Android default), IL2CPP removes engine types the managed code never *names*. Nothing referenced `CapsuleCollider` — the collider Unity puts on a `Cylinder` primitive — so on device `CreatePrimitive(PrimitiveType.Cylinder)` came back with **no collider at all**, and `GetComponent<Collider>().material` threw. Null-check any component you did not add yourself, and remember that naming a type only in a comment does not keep it.
+
+**A desktop player is not a proxy.** Stripping is per-platform: a Windows build booted perfectly clean on the exact code that crashed on the phone. Believe nothing about the device that was not run on the device.
+
+```powershell
+Tools\device-smoke.ps1 -ListDevices   # is a device attached and authorised?
+Tools\device-smoke.ps1                # build APK, install, launch, fail on any logcat exception
+Tools\device-smoke.ps1 -SkipBuild     # re-launch and re-scan what is already installed
+```
+
+Manual triage with `adb` (path in the traps above):
+
+```powershell
+adb logcat -c; adb shell am force-stop com.DefaultCompany.yahtzee
+adb shell monkey -p com.DefaultCompany.yahtzee -c android.intent.category.LAUNCHER 1
+adb logcat -d -v brief > log.txt      # then grep E/Unity
+adb shell screencap -p /sdcard/s.png; adb pull /sdcard/s.png shot.png
+```
+
+Two gotchas that cost time: Unity stack traces in logcat print **innermost frame first**, so the exception type and the frame that actually threw are at the *top* — a paste that starts mid-stack hides the answer. And never redirect `adb exec-out screencap -p` with PowerShell `>`; it adds a BOM and corrupts the PNG. Capture on device and `pull`.
+
 ### Running tests without closing the editor
 
 **Unity allows one instance per project path**, so a headless run against the working copy dies with `HandleProjectAlreadyOpenInAnotherInstance` whenever the editor is open. Don't ask the owner to close it — use the testbed:
@@ -152,7 +177,9 @@ Results XML parses with `[xml]$r = Get-Content out.xml; $r."test-run"` → `tota
 
 1. **Cup pour** — dice currently spawn beside the cup. They should launch from inside it with a tip/pour animation (`KitchenBuilder.CupPosition`, `DiceView3D.PlayRoll`). Note the launch point had to move *inside* the fence when the roll zone tightened; the cup **prop** still sits outside it at x = 0.46, so this needs the prop moved (or the zone widened) rather than just re-pointing the spawn.
 2. **Real art pass** — swap gray-box primitives for the low-poly kitchen; **Oma is a purple-tinted placeholder mannequin** right now. Note: her FBX import extracted real textures (`Assets/Resources/Oma/Ch36_*.png`) that are currently unused — wiring those up is a quick interim improvement over the purple tint. The scorecard also still reads as a dark UI panel rather than paper (unlit UI shader, `UiPalette.Panel` border) — worth a pass here. Re-run `FramingCaptureTests` after any art change.
-3. **Android device build** — 60 fps check, touch input pass, safe-area on a real notch. This is also the outstanding **M2 exit criterion** ("playable on device build" was only ever verified in-editor). Don't let it slip past M4. **Install Android Build Support first** (see §2). The world-space card's tap targets have only ever been exercised through `GameController`, so **actually tapping score boxes is unverified** — first thing to check on device, and the same class of bug as the dice-tap one that survived all of M4.
+3. **Android device build** — **the game builds, installs and runs on a Pixel 10 Pro** (IL2CPP/ARM64), verified by a screenshot pulled off the device: 3D scene, dice, gold keep pads and the diegetic card all render correctly in portrait. That clears the long-outstanding **M2 exit criterion**. Still to do: **60 fps check**, safe-area on a real notch, and a **touch input pass**.
+
+   **Real touch is still unverified.** Every automated test drives `GameController` or `DiceView3D.DieAtScreenPoint` directly, so nothing exercises input through the EventSystem — in particular scorecard cell taps via the world-space `GraphicRaycaster`, and whether `IsPointerOverUi` correctly stops a tap on the card from also reaching the dice underneath. That is the same blind spot that hid the dice-tap bug for all of M4, so sit with the device and tap every control.
 
 ### M5 — Oma lives (not started)
 

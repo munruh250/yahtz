@@ -50,7 +50,7 @@ $proc = Start-Process -FilePath $Unity -ArgumentList $unityArgs -PassThru
 Wait-Process -Id $proc.Id -Timeout 1800
 
 if (-not (Test-Path $results)) {
-    Write-Host "NO RESULTS — last 25 log lines:"
+    Write-Host "NO RESULTS -- last 25 log lines:"
     Get-Content $log -Tail 25
     exit 1
 }
