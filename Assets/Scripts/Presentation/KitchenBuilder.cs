@@ -13,6 +13,8 @@ namespace Yahtzee.Presentation
         {
             public DiceView3D Dice;
             public CameraDirector CameraDirector;
+            /// <summary>The diegetic card on the table — the interactive scorecard in 3D mode.</summary>
+            public ScorecardView Scorecard;
             /// <summary>Null until the Oma FBX assets have been imported (setup tool).</summary>
             public OmaView Oma;
         }
@@ -33,20 +35,26 @@ namespace Yahtzee.Presentation
             BuildProps(root);
             var oma = BuildOma(root);
             var dice = BuildDice(root, controller, camera);
+            var scorecard = ScorecardBuilder.BuildWorld(root, controller, camera);
 
             var director = root.gameObject.AddComponent<CameraDirector>();
             director.Init(camera, new[]
             {
-                // pos, lookAt, fov — portrait framings tuned against the concept mockup via
-                // the FramingCapture renders: Default sees Oma (top) + dice (mid) + near
-                // table edge; DiceFocus/ScorecardFocus are subtle push/tilt variants.
-                (new Vector3(0f, 1.25f, -1.20f), new Vector3(0f, -0.10f, 0.30f), 58f), // Default
+                // pos, lookAt, fov — portrait framings tuned against the concept mockup via the
+                // FramingCapture renders. Default and ScorecardFocus are the two the player
+                // scores from, so both frame the whole card (see WorldScorecardTests); DiceFocus
+                // is the transient push-in during a roll and is free to crop it.
+                // Default is the scoring-capable framing (see GameController.OnDiceSettled), so
+                // it sits back far enough to hold Oma, the dice and the whole card at once.
+                (new Vector3(0f, 1.45f, -1.60f), new Vector3(0f, -0.02f, 0.25f), 58f), // Default
                 (new Vector3(0f, 1.00f, -0.95f), new Vector3(0f, -0.12f, 0.06f), 56f), // DiceFocus
-                (new Vector3(0f, 1.05f, -1.05f), new Vector3(0f, -0.10f, 0.0f), 52f),  // ScorecardFocus
+                // ScorecardFocus sits back and aims high so the diegetic card lands in the
+                // bottom third, fully inside the frustum and clear of the action bar.
+                (new Vector3(0f, 1.22f, -1.42f), new Vector3(0f, 0.02f, -0.20f), 52f), // ScorecardFocus
                 (new Vector3(0f, 0.92f, -0.75f), new Vector3(0f, 0.40f, 0.85f), 50f),  // OmaFocus
             });
 
-            return new Refs { Dice = dice, CameraDirector = director, Oma = oma };
+            return new Refs { Dice = dice, CameraDirector = director, Scorecard = scorecard, Oma = oma };
         }
 
         /// <summary>Set dressing per the concept mockup: black dice cup (right), game box
@@ -135,8 +143,10 @@ namespace Yahtzee.Presentation
             var table = GameObject.CreatePrimitive(PrimitiveType.Cube);
             table.name = "Table";
             table.transform.SetParent(root, false);
-            table.transform.localPosition = new Vector3(0f, TableY - 0.05f, 0.1f);
-            table.transform.localScale = new Vector3(1.7f, 0.1f, 1.5f);
+            // Deepened toward the player (near edge -0.65 → -0.85) to seat the diegetic
+            // scorecard in front of the dice fence. Oma's far edge is unchanged.
+            table.transform.localPosition = new Vector3(0f, TableY - 0.05f, 0f);
+            table.transform.localScale = new Vector3(1.7f, 0.1f, 1.7f);
             table.GetComponent<Renderer>().material = Mat(new Color(0.42f, 0.28f, 0.16f)); // warm wood
             table.GetComponent<BoxCollider>().material = DiePhysicMaterial();
 

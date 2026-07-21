@@ -49,10 +49,11 @@ namespace Yahtzee.Tests
             // Turn start: empty table.
             Capture("0-turnstart-default");
 
-            // After roll 1 (controller put us in DiceFocus; dice placed instantly).
+            // After roll 1 the camera eases back off the roll's push-in, because the player may
+            // score from here and the diegetic card has to be readable in full.
             controller.OnRollTapped();
             yield return null;
-            Capture("1-roll1-dicefocus");
+            Capture("1-roll1-settled");
 
             // Burn the remaining rolls → ScorecardFocus + best-option hints active.
             controller.OnRollTapped();
@@ -64,9 +65,12 @@ namespace Yahtzee.Tests
             director.Set(CameraDirector.Framing.Default, instant: true);
             yield return null;
             Capture("3-default");
+            director.Set(CameraDirector.Framing.DiceFocus, instant: true);
+            yield return null;
+            Capture("4-dicefocus");
             director.Set(CameraDirector.Framing.OmaFocus, instant: true);
             yield return null;
-            Capture("4-omafocus");
+            Capture("5-omafocus");
 
             Assert.IsTrue(File.Exists(Path.Combine(OutDir, "3-default.png")));
         }

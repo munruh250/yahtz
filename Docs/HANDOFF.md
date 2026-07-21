@@ -1,9 +1,9 @@
 # Handoff — Yahtzee with Oma
 
 **Last updated:** 2026-07-20
-**Status:** M1–M3 complete, **M4 ~60%**. The game is fully playable end-to-end in the 3D kitchen scene vs. an auto-playing Oma.
-**Test baseline (must stay green):** EditMode **94**, PlayMode **9**.
-**Next task:** M4 finish — see [What's left](#whats-left), item 1 (diegetic world-space scorecard).
+**Status:** M1–M3 complete, **M4 ~75%**. The game is fully playable end-to-end in the 3D kitchen scene vs. an auto-playing Oma, and the scorecard is now a physical object on the table.
+**Test baseline (must stay green):** EditMode **94**, PlayMode **12**.
+**Next task:** M4 finish — see [What's left](#whats-left), item 1 (cup pour).
 
 ---
 
@@ -76,10 +76,13 @@ Results XML parses with `[xml]$r = Get-Content out.xml; $r."test-run"` → `tota
 - **`IDiceView`** — `SetDice` / `PlayRoll` / `SetInteractable` / `SkipAnimation`. Two implementations:
   - `DiceView3D` + `Die3D` — physics dice, **engine value decided first**, guided settle, watchdog snap, raycast tap-to-keep.
   - `DiceView2D` + `DieView2D` — sprite fallback behind the debug flag.
-- **`KitchenBuilder`** — builds the whole gray-box scene in code (table, fence, lamp + fill light, props, dice, Oma, camera framings). Real art replaces primitives here.
+- **`KitchenBuilder`** — builds the whole gray-box scene in code (table, fence, lamp + fill light, props, dice, the diegetic scorecard, Oma, camera framings). Real art replaces primitives here.
 - **`CameraDirector`** — 4 framings (Default / DiceFocus / ScorecardFocus / OmaFocus), 0.5 s eased blends.
 - **`OmaView`** — idle rotation (idle/shift/talking, 5–12 s) + `PlayReaction(Clap|Disbelief)`.
-- **`UiBuilder`** — screen-space uGUI built in code; `worldDice: true` compacts the scorecard and drops the background so the 3D scene shows through. **`ScorecardView`/`ScoreCellView`** (ghosts, two-tap confirm, Joker dimming, gold hint highlights, bonus bar), **`HudView`** (roll pips, status, totals, skip overlay, peek button, game-over panel), `SafeAreaFitter`, `UiPalette`.
+- **`ScorecardBuilder`** — the one grid builder for both layers. `BuildInto(rect, …)` fills any RectTransform with the 13 boxes + title + bonus row; `BuildWorld(…)` wraps that in a **world-space canvas** lying on the table, propped 24° at the player, on a backing board. Card geometry (size, tilt, z) is a block of named constants at the top of the file — tune there, then re-run the framing renders.
+- **`UiBuilder`** — screen-space uGUI built in code. With `worldDice: true` it keeps only the non-diegetic strip (header, status, action bar, peek, overlays); background, 2D dice row and scorecard all drop away. **`ScorecardView`/`ScoreCellView`** (ghosts, two-tap confirm, Joker dimming, gold hint highlights, bonus bar) are shared verbatim by both layers, **`HudView`** (roll pips, status, totals, skip overlay, peek button, game-over panel), `SafeAreaFitter`, `UiPalette`.
+
+**The constraint the diegetic card creates:** the player may score from any framing the camera *rests* in, so those framings must show all 13 boxes, clear of the action bar, at ≥64 px per box (design §5.5). Portrait is tight — the frustum is only ~25° wide, so card width is the binding limit and tilt is what buys legibility. `WorldScorecardTests` asserts this and prints the measured spans, so retuning is reading numbers off a test run rather than guessing.
 
 ### Editor tools (`Assets/Editor`) — all idempotent, all under the `Yahtzee/` menu
 
@@ -88,9 +91,9 @@ Results XML parses with `[xml]$r = Get-Content out.xml; $r."test-run"` → `tota
 ### Tests
 
 - **EditMode (94)** — exhaustive 7,776-combination scoring sweep vs. a naive oracle, scorecard bonus edges (62/63/64), every Joker branch, engine legality/turn-flow/events with scripted RNG, 200-seed headless games with event-rebuilt totals, save round-trip + resume determinism, 6 AI tests (determinism, query-purity, made-hand keeps, Joker legality, box protection, 1000-game strength band).
-- **PlayMode (9)** — `GameFlowPlayModeTests` (full game vs. auto-Oma, one-box-per-turn, skip under real pacing, save/reload resume, illegal-tap no-ops, 2D-layer regression) · `DiceSoakTests` (**1,000 rolls × 5 dice all rest on engine values**, mid-tumble skip) · `FramingCaptureTests` (renders each framing to PNG).
+- **PlayMode (12)** — `GameFlowPlayModeTests` (full game vs. auto-Oma, one-box-per-turn, skip under real pacing, save/reload resume, illegal-tap no-ops, 2D-layer regression) · `DiceSoakTests` (**1,000 rolls × 5 dice all rest on engine values**, mid-tumble skip) · `FramingCaptureTests` (renders each framing to PNG) · `WorldScorecardTests` (card is world-space + raycastable, rests on the table clear of the dice, fully visible and ≥64 px per box in every scoring framing).
 
-**`FramingCaptureTests` is a reusable design tool**, not just a test: it writes `AppData\LocalLow\DefaultCompany\yahtzee\framings\*.png` headless. That's how the camera was matched to the owner's concept mockup — re-run it after any scene/camera/art change and actually look at the output.
+**`FramingCaptureTests` is a reusable design tool**, not just a test: it writes `AppData\LocalLow\DefaultCompany\yahtzee\framings\*.png` headless. That's how the camera was matched to the owner's concept mockup — re-run it after any scene/camera/art change and actually look at the output. `WorldScorecardTests` is the numeric half of the same loop: it catches "the card drifted off screen / got too small", which a render alone makes easy to eyeball past.
 
 ---
 
@@ -105,6 +108,9 @@ Results XML parses with `[xml]$r = Get-Content out.xml; $r."test-run"` → `tota
 | **JsonUtility for saves** (M1) | `GameState` designed for it (int slots, `-1` sentinel, no nullables/dictionaries); avoids the Newtonsoft dependency |
 | **RNG persisted as seed + draws-consumed** (M1) | `System.Random` isn't serializable; replaying the stream on load keeps resumed games on identical dice |
 | **Custom camera rig, not Cinemachine** (M4) | 4 fixed framings + one blend coroutine didn't justify the package. Revisit only if framing needs grow |
+| **Scorecard is a world-space canvas, not a mesh/texture** (M4) | Keeps `ScoreCellView` and the two-tap confirm byte-identical between the 2D and 3D layers; taps ray-cast via the canvas's own GraphicRaycaster. Cost: UI shaders are unlit, so the card ignores the lamp — revisit during the art pass |
+| **Table deepened toward the player** (M4) | The old near edge (z −0.65) left only 0.27 m in front of the dice fence, too shallow for a legible card. Far edge unchanged, so Oma's side and all dice physics are untouched |
+| **DiceFocus is transient — camera eases back on settle** (M4) | *Owner approved 2026-07-20; supersedes the literal reading of design §5.2 ("push in over the dice **when they settle**").* A physical card means any framing the player can score from must show all 13 boxes, and DiceFocus crops it badly (verified in the renders). The push-in now plays during the tumble and eases to Default once dice rest, where dice stay clearly legible. Rejected alternative: hold the push-in ~0.8 s then ease back — more literal to the spec, but boxes are unreachable during the hold, so a tap can land on nothing |
 | **UI built in code, not prefabs** (M2) | The 2D layer is throwaway scaffolding; code keeps the whole layout reviewable and diffable |
 | German flavor phrases in Oma's dialogue | Owner approved; flavor only, never rules-critical; game stays English-only |
 | Restart = no consequence; no stats/meta/monetization in v1 | Owner decision; cozy game |
@@ -124,10 +130,9 @@ Results XML parses with `[xml]$r = Get-Content out.xml; $r."test-run"` → `tota
 
 ### M4 finish (current milestone)
 
-1. **Diegetic world-space scorecard** — the card should lie on the table angled toward the camera (design §5.2/§5.3), replacing the compact screen-space panel. Same `ScoreCellView` logic re-parented into world space; taps ray-cast against a world-space canvas. Verify legibility at the ScorecardFocus framing on a small screen.
-2. **Cup pour** — dice currently spawn beside the cup. They should launch from inside it with a tip/pour animation (`KitchenBuilder.CupPosition`, `DiceView3D.PlayRoll`).
-3. **Real art pass** — swap gray-box primitives for the low-poly kitchen; **Oma is a purple-tinted placeholder mannequin** right now. Note: her FBX import extracted real textures (`Assets/Resources/Oma/Ch36_*.png`) that are currently unused — wiring those up is a quick interim improvement over the purple tint. Re-run `FramingCaptureTests` after any art change.
-4. **Android device build** — 60 fps check, touch input pass, safe-area on a real notch. This is also the outstanding **M2 exit criterion** ("playable on device build" was only ever verified in-editor). Don't let it slip past M4.
+1. **Cup pour** — dice currently spawn beside the cup. They should launch from inside it with a tip/pour animation (`KitchenBuilder.CupPosition`, `DiceView3D.PlayRoll`).
+2. **Real art pass** — swap gray-box primitives for the low-poly kitchen; **Oma is a purple-tinted placeholder mannequin** right now. Note: her FBX import extracted real textures (`Assets/Resources/Oma/Ch36_*.png`) that are currently unused — wiring those up is a quick interim improvement over the purple tint. The scorecard also still reads as a dark UI panel rather than paper (unlit UI shader, `UiPalette.Panel` border) — worth a pass here. Re-run `FramingCaptureTests` after any art change.
+3. **Android device build** — 60 fps check, touch input pass, safe-area on a real notch. This is also the outstanding **M2 exit criterion** ("playable on device build" was only ever verified in-editor). Don't let it slip past M4. Note the world-space card's tap targets have only ever been exercised through `GameController` in tests — **actually tapping boxes on a device is unverified** and is the first thing to check.
 
 ### M5 — Oma lives (not started)
 
@@ -143,6 +148,7 @@ Title / Results / Pause screens (only a game-over panel exists) · audio (`Audio
 ### Loose ends
 
 - Strip unused template modules (terrain, vehicles, XR) — cleanup, not urgent.
+- **EventSystem leak across scene loads** (pre-existing, surfaced by the new tests). `UiBuilder.EnsureEventSystem` tags the object `HideFlags.DontSave`, which also means "survives scene load", so each reload adds another and Unity logs *"There are N event systems in the scene"*. Harmless today (the game loads its scene once) but it will bite in M6 when Title ⇄ Game navigation lands, and multiple EventSystems break input.
 - Final game name / trademark review — before store submission.
 
 ---

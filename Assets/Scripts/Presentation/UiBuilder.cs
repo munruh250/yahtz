@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -17,6 +16,7 @@ namespace Yahtzee.Presentation
         {
             /// <summary>Null when built for world-space (3D) dice.</summary>
             public DiceView2D Dice;
+            /// <summary>Null in 3D mode — the card is diegetic there, built by KitchenBuilder.</summary>
             public ScorecardView Scorecard;
             public HudView Hud;
         }
@@ -30,9 +30,10 @@ namespace Yahtzee.Presentation
             "Yahtzee", "Chance",
         };
 
-        /// <summary>Builds the screen-space UI. With <paramref name="worldDice"/> the canvas
-        /// has no background or 2D dice row (the camera shows the kitchen through that band)
-        /// and the scorecard compacts into the lower third.</summary>
+        /// <summary>Builds the screen-space UI. With <paramref name="worldDice"/> the canvas keeps
+        /// only the non-diegetic strip design §5.2 allows — header, status, action bar, peek and
+        /// the overlays. Background, dice row and scorecard all drop away: the camera shows the
+        /// kitchen, and the card is a physical object on the table.</summary>
         public static Refs Build(Transform root, GameController controller, bool worldDice = false)
         {
             EnsureEventSystem();
@@ -55,8 +56,10 @@ namespace Yahtzee.Presentation
             var refs = new Refs();
             BuildHeaderAndStatus(safe, out var header, out var status);
             if (!worldDice)
+            {
                 refs.Dice = BuildDiceRow(safe, controller);
-            refs.Scorecard = BuildScorecard(safe, controller, worldDice);
+                refs.Scorecard = BuildScorecard(safe, controller);
+            }
             BuildActionBar(safe, controller, out var rollButton, out var rollLabel);
 
             // Sibling order = raycast/draw order: skip overlay above the play surface,
@@ -115,42 +118,10 @@ namespace Yahtzee.Presentation
             return view;
         }
 
-        private static ScorecardView BuildScorecard(RectTransform parent, GameController controller, bool compact)
+        private static ScorecardView BuildScorecard(RectTransform parent, GameController controller)
         {
-            // Compact (3D) mode leaves the 0.47-0.90 band open so the camera's view of the
-            // table dice shows through the transparent canvas.
-            var top = compact ? 0.47f : 0.77f;
-            var outer = Image(parent, "Scorecard", new Vector2(0.02f, 0.115f), new Vector2(0.98f, top), UiPalette.Panel).rectTransform;
-            var view = outer.gameObject.AddComponent<ScorecardView>();
-            var title = Text(outer, "Owner", "YOUR CARD", 28f, UiPalette.CreamDim, TextAlignmentOptions.Center,
-                new Vector2(0f, 0.945f), new Vector2(1f, 1f));
-            var panel = Rect(outer, "Grid", Vector2.zero, new Vector2(1f, 0.945f));
-            var cells = new Dictionary<Category, ScoreCellView>();
-
-            // Left column: upper section + bonus progress row. Right column: lower section.
-            var left = new[] { Category.Aces, Category.Twos, Category.Threes, Category.Fours, Category.Fives, Category.Sixes };
-            var right = new[]
-            {
-                Category.ThreeOfAKind, Category.FourOfAKind, Category.FullHouse, Category.SmallStraight,
-                Category.LargeStraight, Category.Yahtzee, Category.Chance,
-            };
-            const float rows = 7f;
-            for (int r = 0; r < left.Length; r++)
-                cells[left[r]] = BuildCell(panel, left[r], controller,
-                    new Vector2(0.015f, 1f - (r + 1) / rows), new Vector2(0.495f, 1f - r / rows));
-            for (int r = 0; r < right.Length; r++)
-                cells[right[r]] = BuildCell(panel, right[r], controller,
-                    new Vector2(0.505f, 1f - (r + 1) / rows), new Vector2(0.985f, 1f - r / rows));
-
-            // Bonus progress row fills the left column's last slot.
-            var bonusRow = Image(panel, "BonusRow", new Vector2(0.015f, 1f - 7f / rows), new Vector2(0.495f, 1f - 6f / rows), UiPalette.CreamDim).rectTransform;
-            Pad(bonusRow, 4f);
-            // Progress rendered by anchoring the fill's right edge (no sprite needed).
-            var fill = Image(bonusRow, "Fill", Vector2.zero, new Vector2(0f, 1f), UiPalette.GoldDark);
-            var bonusLabel = Text(bonusRow, "Label", "", 30f, UiPalette.Ink, TextAlignmentOptions.Center, Vector2.zero, Vector2.one);
-
-            view.Init(cells, bonusLabel, fill, title);
-            return view;
+            var outer = Image(parent, "Scorecard", new Vector2(0.02f, 0.115f), new Vector2(0.98f, 0.77f), UiPalette.Panel).rectTransform;
+            return ScorecardBuilder.BuildInto(outer, controller);
         }
 
         private static GameObject BuildSkipOverlay(RectTransform parent, GameController controller)
@@ -172,24 +143,6 @@ namespace Yahtzee.Presentation
             label = Text(bg.rectTransform, "Label", "Peek: Oma", 30f, UiPalette.Cream, TextAlignmentOptions.Center,
                 Vector2.zero, Vector2.one);
             button = bg.gameObject;
-        }
-
-        private static ScoreCellView BuildCell(RectTransform parent, Category category, GameController controller, Vector2 aMin, Vector2 aMax)
-        {
-            var bg = Image(parent, Names[(int)category], aMin, aMax, UiPalette.Cream);
-            Pad(bg.rectTransform, 4f);
-            var button = bg.gameObject.AddComponent<Button>();
-            button.targetGraphic = bg;
-            var name = Text(bg.rectTransform, "Name", Names[(int)category], 30f, UiPalette.Ink, TextAlignmentOptions.MidlineLeft,
-                new Vector2(0f, 0f), new Vector2(0.68f, 1f));
-            name.rectTransform.offsetMin = new Vector2(16f, 0f);
-            var value = Text(bg.rectTransform, "Value", "", 36f, UiPalette.InkGhost, TextAlignmentOptions.MidlineRight,
-                new Vector2(0.68f, 0f), new Vector2(1f, 1f));
-            value.rectTransform.offsetMax = new Vector2(-16f, 0f);
-
-            var cell = bg.gameObject.AddComponent<ScoreCellView>();
-            cell.Init(bg, name, value, button, () => controller.OnCellTapped(category));
-            return cell;
         }
 
         private static void BuildActionBar(RectTransform parent, GameController controller, out Button rollButton, out TextMeshProUGUI rollLabel)
@@ -229,7 +182,7 @@ namespace Yahtzee.Presentation
                 Vector2.zero, Vector2.one).fontStyle = FontStyles.Bold;
         }
 
-        // ---- Primitive helpers ---------------------------------------------
+        // ---- Primitive helpers (shared with ScorecardBuilder) ----------------
 
         private static void EnsureEventSystem()
         {
@@ -239,7 +192,7 @@ namespace Yahtzee.Presentation
             go.hideFlags = HideFlags.DontSave;
         }
 
-        private static RectTransform Rect(Transform parent, string name, Vector2 aMin, Vector2 aMax)
+        internal static RectTransform Rect(Transform parent, string name, Vector2 aMin, Vector2 aMax)
         {
             var go = new GameObject(name, typeof(RectTransform));
             var rect = (RectTransform)go.transform;
@@ -251,14 +204,14 @@ namespace Yahtzee.Presentation
             return rect;
         }
 
-        private static Image Image(Transform parent, string name, Vector2 aMin, Vector2 aMax, Color color)
+        internal static Image Image(Transform parent, string name, Vector2 aMin, Vector2 aMax, Color color)
         {
             var image = Rect(parent, name, aMin, aMax).gameObject.AddComponent<Image>();
             image.color = color;
             return image;
         }
 
-        private static TextMeshProUGUI Text(Transform parent, string name, string content, float size, Color color,
+        internal static TextMeshProUGUI Text(Transform parent, string name, string content, float size, Color color,
             TextAlignmentOptions align, Vector2 aMin, Vector2 aMax)
         {
             var text = Rect(parent, name, aMin, aMax).gameObject.AddComponent<TextMeshProUGUI>();
@@ -272,7 +225,7 @@ namespace Yahtzee.Presentation
             return text;
         }
 
-        private static void Pad(RectTransform rect, float pixels)
+        internal static void Pad(RectTransform rect, float pixels)
         {
             rect.offsetMin = new Vector2(rect.offsetMin.x + pixels, rect.offsetMin.y + pixels);
             rect.offsetMax = new Vector2(rect.offsetMax.x - pixels, rect.offsetMax.y - pixels);

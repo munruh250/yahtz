@@ -50,18 +50,20 @@ namespace Yahtzee.Presentation
         {
             Application.targetFrameRate = 60;
             var refs = UiBuilder.Build(transform, this, Use3dDice);
-            _scorecard = refs.Scorecard;
             _hud = refs.Hud;
             if (Use3dDice)
             {
+                // In 3D the card is a physical object on the table, so the kitchen owns it.
                 var kitchen = KitchenBuilder.Build(transform, this, Camera.main);
                 _dice = kitchen.Dice;
                 _cameraDirector = kitchen.CameraDirector;
+                _scorecard = kitchen.Scorecard;
                 _omaView = kitchen.Oma;
             }
             else
             {
                 _dice = refs.Dice;
+                _scorecard = refs.Scorecard;
             }
         }
 
@@ -280,10 +282,15 @@ namespace Yahtzee.Presentation
         private void OnDiceSettled()
         {
             InputLocked = false;
-            // Out of rolls on the player's turn: ease toward the card and hint the best
-            // boxes (user-requested treatment; suggestions computed in RefreshAll).
-            if (!IsOmaTurn && Engine.RollsRemaining == 0 && Engine.State.Phase == GamePhase.Deciding)
-                _cameraDirector?.Set(CameraDirector.Framing.ScorecardFocus);
+            // The card is a physical object on the table, so every framing the player can score
+            // from has to show all 13 boxes — DiceFocus crops it. Treat DiceFocus as the roll's
+            // push-in only and ease back once the dice rest: to the card when the rolls are
+            // spent (with best-option hints, computed in RefreshAll), otherwise to the framing
+            // that reads dice and card together.
+            if (!IsOmaTurn && Engine.State.Phase == GamePhase.Deciding)
+                _cameraDirector?.Set(Engine.RollsRemaining == 0
+                    ? CameraDirector.Framing.ScorecardFocus
+                    : CameraDirector.Framing.Default);
             RefreshAll();
         }
 
