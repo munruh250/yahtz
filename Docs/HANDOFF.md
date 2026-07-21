@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-07-20
 **Status:** M1–M3 complete, **M4 ~75%**. The game is fully playable end-to-end in the 3D kitchen scene vs. an auto-playing Oma, and the scorecard is now a physical object on the table.
-**Test baseline (must stay green):** EditMode **101**, PlayMode **23**. Run them with `Tools\run-tests.ps1` — no need to close the editor.
+**Test baseline (must stay green):** EditMode **101**, PlayMode **24**. Run them with `Tools\run-tests.ps1` — no need to close the editor.
 **Next task:** M4 finish — see [What's left](#whats-left), item 1 (cup pour).
 
 ---
@@ -216,10 +216,9 @@ Title / Results / Pause screens (only a game-over panel exists) · audio (`Audio
 
 ### Loose ends
 
-- **The game's typeface is not installed yet.** `Assets/Fonts/` is empty; drop a `.ttf`/`.otf` in and run **Yahtzee > Build Font Asset** (or `Setup Project`, which calls it). That generates `Assets/Resources/Fonts/GameFont.asset`, which `UiBuilder` applies to every text in the game; until then TMP's default face is used, so a missing font is a downgrade rather than a break. The generated asset falls back to TMP's default for glyphs the face lacks — which matters, because the wall samplers use German umlauts and a handwriting face often has none. A missing glyph renders as a tofu box; that has already shipped once, with a checkmark.
+- **Replacing the typeface:** drop a `.ttf`/`.otf` into `Assets/Fonts/` and run **Yahtzee > Build Font Asset**. The current face is `DearGrandma.otf`, built to `Assets/Resources/Fonts/GameFont.asset`, which `UiBuilder` applies to every text in the game. Note it is *wider* than a plain sans — swapping faces can overflow the scorecard's name column into the printed hints, which is what the tight column splits in `ScorecardBuilder.BuildCell` are for. Check the screen renders after any change.
 
 - Strip unused template modules (terrain, vehicles, XR) — cleanup, not urgent. **Adaptive Performance is already gone**: it was never in `manifest.json` directly but came via `com.unity.feature.mobile`, which is why removing it in Package Manager never stuck — the feature set re-added it on every resolve. Removing the feature set took Adaptive Performance, mobile-notifications and android-logcat with it.
-- **EventSystem leak across scene loads** (pre-existing, surfaced by the new tests). `UiBuilder.EnsureEventSystem` tags the object `HideFlags.DontSave`, which also means "survives scene load", so each reload adds another and Unity logs *"There are N event systems in the scene"*. Harmless today (the game loads its scene once) but it will bite in M6 when Title ⇄ Game navigation lands, and multiple EventSystems break input.
 - Final game name / trademark review — before store submission.
 
 ---

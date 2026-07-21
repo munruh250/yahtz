@@ -108,8 +108,8 @@ namespace Yahtzee.Presentation
                 Category.LargeStraight, Category.Yahtzee, Category.Chance,
             };
 
-            AddSectionBand(panel, "UPPER SECTION", 0.012f, 0.494f);
-            AddSectionBand(panel, "LOWER SECTION", 0.506f, 0.988f);
+            AddSectionBand(panel, "UPPER", 0.012f, 0.494f);
+            AddSectionBand(panel, "LOWER", 0.506f, 0.988f);
 
             for (int r = 0; r < left.Length; r++)
                 cells[left[r]] = BuildCell(panel, left[r], controller, 0.012f, 0.494f, r, Hint(left[r]));
@@ -170,16 +170,16 @@ namespace Yahtzee.Presentation
             rule.rectTransform.offsetMax = new Vector2(0f, 2f);
             rule.raycastTarget = false;
 
-            var name = UiBuilder.Text(bg.rectTransform, "Name", UiBuilder.DisplayName(category), 28f, UiPalette.InkDark,
-                TextAlignmentOptions.MidlineLeft, new Vector2(0f, 0f), new Vector2(0.60f, 1f));
-            name.rectTransform.offsetMin = new Vector2(14f, 0f);
+            var name = UiBuilder.Text(bg.rectTransform, "Name", UiBuilder.DisplayName(category), 24f, UiPalette.InkDark,
+                TextAlignmentOptions.MidlineLeft, new Vector2(0f, 0f), new Vector2(0.66f, 1f));
+            name.rectTransform.offsetMin = new Vector2(12f, 0f);
 
             if (hint.Length > 0)
-                UiBuilder.Text(bg.rectTransform, "Hint", hint, 21f, UiPalette.PaperRule,
-                    TextAlignmentOptions.Center, new Vector2(0.60f, 0f), new Vector2(0.74f, 1f));
+                UiBuilder.Text(bg.rectTransform, "Hint", hint, 17f, UiPalette.PaperRule,
+                    TextAlignmentOptions.MidlineRight, new Vector2(0.62f, 0f), new Vector2(0.78f, 1f));
 
             var value = UiBuilder.Text(bg.rectTransform, "Value", "", 34f, UiPalette.InkGhost,
-                TextAlignmentOptions.MidlineRight, new Vector2(0.74f, 0f), new Vector2(1f, 1f));
+                TextAlignmentOptions.MidlineRight, new Vector2(0.78f, 0f), new Vector2(1f, 1f));
             value.rectTransform.offsetMax = new Vector2(-14f, 0f);
 
             var cell = bg.gameObject.AddComponent<ScoreCellView>();

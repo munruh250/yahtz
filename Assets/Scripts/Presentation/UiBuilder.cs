@@ -300,12 +300,35 @@ namespace Yahtzee.Presentation
             }
         }
 
+        /// <summary>Exactly one EventSystem, and one that dies with its scene.
+        ///
+        /// **No hideFlags.** It used to be tagged `HideFlags.DontSave`, which means both "don't
+        /// serialise into the scene" AND "survive scene loads" — so every reload left the previous
+        /// one alive and added another. Unity disables all but one and logs "There are N event
+        /// systems in the scene", and a disabled EventSystem means no UI input at all. Harmless
+        /// while the game loaded its one scene once; Title ⇄ Game navigation is exactly the case
+        /// that would have broken.
+        ///
+        /// The flags were never needed: this object is created in Awake, so it is not part of the
+        /// scene asset and there is nothing to keep out of it. Without them it lives and dies with
+        /// its scene, which is the whole requirement.
+        ///
+        /// The sweep clears any strays a previous build left behind; the inactive search matters
+        /// because FindAnyObjectByType skips inactive objects, so a disabled leftover would go
+        /// unnoticed and could re-enable itself later.</summary>
         private static void EnsureEventSystem()
         {
-            if (Object.FindAnyObjectByType<EventSystem>() != null)
+            var existing = Object.FindObjectsByType<EventSystem>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            if (existing.Length > 0)
+            {
+                for (int i = 1; i < existing.Length; i++)
+                    Object.DestroyImmediate(existing[i].gameObject);
+                existing[0].gameObject.SetActive(true);
+                existing[0].enabled = true;
                 return;
-            var go = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
-            go.hideFlags = HideFlags.DontSave;
+            }
+
+            new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
         }
 
         internal static RectTransform Rect(Transform parent, string name, Vector2 aMin, Vector2 aMax)
