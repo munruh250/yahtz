@@ -1,9 +1,9 @@
 # Handoff — Yahtzee with Oma
 
 **Last updated:** 2026-07-20
-**Status:** M1–M3 complete, **M4 ~90%** (only the real art pass is left). The game is fully playable end-to-end in the 3D kitchen scene vs. an auto-playing Oma, and the scorecard is now a physical object on the table.
-**Test baseline (must stay green):** EditMode **101**, PlayMode **24**. Run them with `Tools\run-tests.ps1` — no need to close the editor.
-**Next task:** M5 — Oma's dialogue. See [What's left](#whats-left).
+**Status:** M1–M3 complete, **M4 ~90%** (only the real art pass is left), **M5 dialogue done** — Oma talks. The game is fully playable end-to-end in the 3D kitchen scene vs. an auto-playing Oma, and the scorecard is now a physical object on the table.
+**Test baseline (must stay green):** EditMode **111**, PlayMode **24**. Run them with `Tools\run-tests.ps1` — no need to close the editor.
+**Next task:** the art pass (M4) and M6 polish. See [What's left](#whats-left).
 
 ---
 
@@ -134,6 +134,7 @@ Results XML parses with `[xml]$r = Get-Content out.xml; $r."test-run"` → `tota
 - **`UiPalette`** — the whole game's colour, **named by role, not hue** (`Accent`, `Chrome`, `Paper`, `Ink`), so a re-tint never leaves a field called `Gold` holding a blue. Cozy/cartoony direction: soft periwinkle and lilac against warm cream, ink a deep indigo. Nothing fully saturated, nothing pure black or white.
 - **`UiSprites`** — rounded-rect sprites generated at runtime and 9-sliced, so every panel, button and tile has soft corners at any size. `UiBuilder.Image` applies one by default; `UiBuilder.Fill` is the square-cornered escape hatch for full-bleed backdrops, hairline rules and progress fills. Hard rectangles were most of what made the old chrome read as a spreadsheet.
 - **`DiceSkins`** — cosmetic dice colours (Classic, Ruby). The engine decides values and physics is theatre, so a skin can never touch gameplay. `DiceView3D.ApplySkin` re-tints the two shared materials, so a change repaints all five dice at once.
+- **`DialogueService` / `OmaDialogue`** — Oma's reactions. Reads the same `GameEvent` stream everything else does, so she can never react to something that did not happen. `DialogueService` is a plain C# class deciding *what* she says (the caller shows it), which makes the whole trigger map testable without a scene. `OmaDialoguePicker` uses every variant before repeating and resets each game. **Its RNG is its own, never the engine's** — drawing from the seeded stream would change the dice a player sees depending on what Oma happened to say.
 - **`OmaHints`** — wording for `KeepAdvice`: advice always in plain English, one German flavour line appended (baking, or her bichon frisé *Tiny Bubbles Sunshine*), never repeating twice running. M5 moves the pool into the `OmaDialogueSet` ScriptableObject.
 - **`UiBuilder`** — screen-space uGUI built in code. With `worldDice: true` it keeps only the non-diegetic strip (header, status, action bar, peek, overlays); background, 2D dice row and scorecard all drop away. **`ScorecardView`/`ScoreCellView`** (ghosts, two-tap confirm, Joker dimming, gold hint highlights, bonus bar) are shared verbatim by both layers, **`HudView`** (roll pips, status, totals, skip overlay, peek button, game-over panel), `SafeAreaFitter`, `UiPalette`.
 
@@ -206,7 +207,7 @@ Results XML parses with `[xml]$r = Get-Content out.xml; $r."test-run"` → `tota
 ### M5 — Oma lives (not started)
 
 - `DialogueService` subscribing to the same `GameEvent`s, mapping to trigger types, picking unused variants from an `OmaDialogueSet` ScriptableObject (per-game no-repeat set).
-- ~~`SpeechBubbleController`~~ — **done early**, as `SpeechBubbleView`, to carry the Ask Oma hint. Auto-dismiss, replace-don't-queue, never blocks input. `DialogueService` should drive it as-is.
+- ~~`DialogueService`~~, ~~`SpeechBubbleController`~~, ~~trigger/line set~~ — **done.** All 13 design §2 triggers with 3+ variants each, enforced by `OmaDialogueTests` (3+ variants, ≤90 chars per line — the rules that erode as lines get added).
 - Full v1 trigger/line set per design §2 (3+ variants each, German flavor phrases).
 - Real Oma model integration; expression tech (blend shapes vs. material/UV swap) still undecided — decide with the artist. `OmaView`'s API stays the same either way.
 

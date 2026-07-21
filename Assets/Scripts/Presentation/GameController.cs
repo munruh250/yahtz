@@ -51,6 +51,7 @@ namespace Yahtzee.Presentation
         private ScorecardView _scorecard;
         private HudView _hud;
         private SpeechBubbleView _speech;
+        private readonly DialogueService _dialogue = new DialogueService();
         private ScreensView _screens;
         private DiceView3D _dice3d;   // null in 2D mode
         private OmaView _omaView;               // null in 2D mode or before assets import
@@ -127,6 +128,7 @@ namespace Yahtzee.Presentation
             _hud.CloseMenu();
             _speech.Hide(); // a hint about the previous game's dice would be nonsense
             RefreshAll();
+            Say(_dialogue.StartGame());
 
             // A loaded save may resume mid-Oma-turn.
             if (IsOmaTurn)
@@ -307,6 +309,7 @@ namespace Yahtzee.Presentation
 
         private void OnGameEvent(GameEvent gameEvent)
         {
+            Say(_dialogue.React(gameEvent, Engine.State));
             switch (gameEvent)
             {
                 case DiceRolled rolled:
@@ -336,6 +339,15 @@ namespace Yahtzee.Presentation
                     _hud.ShowGameOver(ended);
                     break;
             }
+        }
+
+        /// <summary>Put a line in Oma's bubble. Silent while a front-end screen covers the game —
+        /// she would be talking to a title card.</summary>
+        private void Say(string line)
+        {
+            if (string.IsNullOrEmpty(line) || _speech == null || (_screens != null && _screens.IsOpen))
+                return;
+            _speech.Show(line, DialogueService.BubbleSeconds);
         }
 
         private void OnDiceSettled()

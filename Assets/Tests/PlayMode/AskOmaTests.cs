@@ -35,7 +35,9 @@ namespace Yahtzee.Tests
             var controller = Object.FindAnyObjectByType<GameController>();
             var bubble = Object.FindAnyObjectByType<SpeechBubbleView>();
             Assert.IsNotNull(bubble);
-            Assert.IsFalse(bubble.IsShowing, "no bubble before anything happens");
+            // Oma greets the player at game start (design §2), so clear that first: this test is
+            // about the hint, not about the bubble being empty.
+            bubble.Hide();
 
             controller.OnRollTapped();
             controller.OnAskOmaTapped();
@@ -96,9 +98,10 @@ namespace Yahtzee.Tests
             var controller = Object.FindAnyObjectByType<GameController>();
             var bubble = Object.FindAnyObjectByType<SpeechBubbleView>();
 
-            // Before the first roll there are no dice on the table.
+            // Before the first roll there are no dice on the table. Clear her greeting first.
+            bubble.Hide();
             controller.OnAskOmaTapped();
-            Assert.IsFalse(bubble.IsShowing);
+            Assert.IsFalse(bubble.IsShowing, "nothing to advise on, so nothing should be said");
             Assert.AreEqual(GamePhase.TurnStart, controller.Engine.State.Phase);
 
             // And during Oma's turn it is not the player's decision to make.
@@ -107,6 +110,7 @@ namespace Yahtzee.Tests
             controller.OnCellTapped(best);
             controller.OnCellTapped(best);
             Assert.IsTrue(controller.IsOmaTurn);
+            bubble.Hide(); // she may have reacted to the score just committed
             controller.OnAskOmaTapped();
             Assert.IsFalse(bubble.IsShowing, "no hints while Oma is playing");
 

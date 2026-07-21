@@ -4,6 +4,7 @@
     "references": [
         "Yahtzee.Core",
         "Yahtzee.Services",
+        "Yahtzee.Presentation",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],
