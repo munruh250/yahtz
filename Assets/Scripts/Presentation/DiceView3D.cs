@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using Yahtzee.Core;
@@ -14,7 +15,7 @@ namespace Yahtzee.Presentation
         private Die3D[] _dice;
         private Camera _camera;
         private GameController _controller;
-        private Vector3 _cupPosition;
+        private DiceCupView _cup;
         private Vector3[] _restSlots;
         private Vector3[] _keepSlots;
         private Transform[] _keepMarkers;
@@ -24,18 +25,21 @@ namespace Yahtzee.Presentation
         /// <summary>Ray length for tap picking — the seated framings sit ~2.5 m from the table.</summary>
         private const float PickDistance = 8f;
         private Action _pendingSettled;
+        private int[] _pendingValues;
+        private bool[] _pendingKept;
+        private Coroutine _pour;
         private readonly bool[] _placedKept = new bool[5];
         private System.Random _throwRng = new System.Random();
 
         public Die3D[] Dice => _dice;
 
         public void Init(Die3D[] dice, Camera camera, GameController controller,
-            Vector3 cupPosition, Vector3[] restSlots, Vector3[] keepSlots, Transform[] keepMarkers)
+            DiceCupView cup, Vector3[] restSlots, Vector3[] keepSlots, Transform[] keepMarkers)
         {
             _dice = dice;
             _camera = camera;
             _controller = controller;
-            _cupPosition = cupPosition;
+            _cup = cup;
             _restSlots = restSlots;
             _keepSlots = keepSlots;
             _keepMarkers = keepMarkers;
@@ -87,28 +91,63 @@ namespace Yahtzee.Presentation
             }
 
             _pendingSettled = onSettled;
+            _pendingValues = values;
+            _pendingKept = kept;
+
+            // Kept dice never leave the table; only the loose ones go back in the cup.
             for (int i = 0; i < _dice.Length; i++)
             {
-                _dice[i].gameObject.SetActive(true);
-                ShowKeepMarker(i, kept[i]);
-                if (kept[i])
-                {
-                    _dice[i].PlaceAt(_keepSlots[i], values[i], DeterministicYaw(i, values[i]));
-                    _placedKept[i] = true;
+                if (!kept[i])
                     continue;
-                }
+                _dice[i].gameObject.SetActive(true);
+                ShowKeepMarker(i, true);
+                _dice[i].PlaceAt(_keepSlots[i], values[i], DeterministicYaw(i, values[i]));
+                _placedKept[i] = true;
+            }
+            // Loose dice are hidden until they actually leave the cup, or they would sit on the
+            // table in plain sight while the cup theatrically tips over.
+            for (int i = 0; i < _dice.Length; i++)
+                if (!kept[i])
+                    _dice[i].gameObject.SetActive(false);
+
+            _pour = StartCoroutine(PourRoutine());
+        }
+
+        /// <summary>Tip the cup, then spill the loose dice from its mouth.</summary>
+        private IEnumerator PourRoutine()
+        {
+            yield return _cup.Tip();
+            SpillFromCup(_pendingValues, _pendingKept);
+            _cup.Return(); // overlaps the tumble, so it costs no extra time
+            _pour = null;
+        }
+
+        private void SpillFromCup(int[] values, bool[] kept)
+        {
+            var mouth = _cup.Mouth;
+            var spill = _cup.SpillDirection;
+            int spilled = 0;
+            for (int i = 0; i < _dice.Length; i++)
+            {
+                if (kept[i])
+                    continue;
+                _dice[i].gameObject.SetActive(true);
+                ShowKeepMarker(i, false);
                 _placedKept[i] = false;
-                // Tossed underarm from the player's edge of the table, away from the camera.
-                // Speed is set explicitly rather than scaled by the distance to the target slot:
-                // the throw now starts close to those slots, so a distance-scaled impulse would
-                // barely move the dice. Kept gentle — in a tight roll zone a harder throw just
-                // pinballs off the walls and the values skitter about.
-                var from = _cupPosition + new Vector3(Rnd(-0.10f, 0.10f), Rnd(0f, 0.05f), Rnd(-0.02f, 0.02f));
+
+                // Strung out along the pour rather than piled on one point. Five dice born
+                // inside a 0.06 cube overlap each other, and PhysX resolves that by flinging
+                // them apart -- a die was found 12 m away. The stagger is a die-width apart so
+                // they start clear, and maxDepenetrationVelocity caps the damage if they ever
+                // do overlap.
+                var from = mouth + spill * (spilled * 0.11f)
+                           + new Vector3(Rnd(-0.015f, 0.015f), Rnd(-0.015f, 0.015f), Rnd(-0.015f, 0.015f));
+                spilled++;
                 var target = _restSlots[i];
                 var toTarget = new Vector3(target.x - from.x, 0f, target.z - from.z);
                 var heading = toTarget.sqrMagnitude > 1e-4f ? toTarget.normalized : Vector3.forward;
-                var velocity = heading * Rnd(0.60f, 0.95f) + Vector3.up * Rnd(0.55f, 0.85f);
-                var spin = new Vector3(Rnd(-12f, 12f), Rnd(-12f, 12f), Rnd(-12f, 12f));
+                var velocity = spill * Rnd(0.35f, 0.55f) + heading * Rnd(0.30f, 0.55f);
+                var spin = new Vector3(Rnd(-14f, 14f), Rnd(-14f, 14f), Rnd(-14f, 14f));
                 _dice[i].LaunchRoll(values[i], from, velocity, spin);
             }
         }
@@ -136,6 +175,15 @@ namespace Yahtzee.Presentation
         {
             if (_pendingSettled == null)
                 return;
+            if (_pour != null)
+            {
+                // Still tipping: the loose dice have not been thrown yet, so there is nothing to
+                // snap. Put the cup down and place them.
+                StopCoroutine(_pour);
+                _pour = null;
+                _cup.SnapToRest();
+                SetDice(_pendingValues, _pendingKept);
+            }
             foreach (var die in _dice)
                 die.SnapNow();
             // FireSettledIfDone runs in Update; force the check now for instant skips.
@@ -176,6 +224,11 @@ namespace Yahtzee.Presentation
         private void FireSettledIfDone()
         {
             if (_pendingSettled == null)
+                return;
+            // Loose dice are inactive while the cup tips, and the loop below treats an inactive
+            // die as settled — so without this the roll "finishes" before a single die is thrown,
+            // and the engine's values are read off dice still sitting from the previous turn.
+            if (_pour != null)
                 return;
             foreach (var die in _dice)
                 if (die.gameObject.activeSelf && !die.Settled)

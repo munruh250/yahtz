@@ -38,12 +38,6 @@ namespace Yahtzee.Presentation
         private const float SlotSpacingX = 0.12f;
         private static float RollZoneCenterZ => (RollZoneMinZ + RollZoneMaxZ) / 2f;
 
-        /// <summary>Where a throw starts: low, centred, at the player's near edge of the play
-        /// area, so the dice come off *your* side of the table and tumble away from the camera.
-        /// It has to sit inside the fence — the walls are what keep the dice on the table, so a
-        /// throw starting behind one would simply bounce off it and never arrive.</summary>
-        private static readonly Vector3 ThrowOrigin = new Vector3(0f, 0.10f, RollZoneMinZ + 0.02f);
-
         public static Refs Build(Transform parent, GameController controller, Camera camera)
         {
             var root = new GameObject("Kitchen3D").transform;
@@ -53,9 +47,9 @@ namespace Yahtzee.Presentation
             BuildTable(root);
             BuildFence(root);
             BuildLamp(root);
-            BuildProps(root, controller);
+            var cup = BuildProps(root, controller);
             var oma = BuildOma(root);
-            var dice = BuildDice(root, controller, camera);
+            var dice = BuildDice(root, controller, camera, cup);
             var scorecard = ScorecardBuilder.BuildWorld(root, controller, camera);
 
             // Props stay tappable whenever the player is in charge — you can peek at Oma's card
@@ -71,15 +65,23 @@ namespace Yahtzee.Presentation
 
         /// <summary>Set dressing per the concept mockup: black dice cup (right), game box
         /// (left, outside the fence), Oma's mug and face-down scorecard on her side.</summary>
-        private static void BuildProps(Transform root, GameController controller)
+        private static DiceCupView BuildProps(Transform root, GameController controller)
         {
+            // The cup sits on the player's right and is animated by DiceView3D: it lifts, tips
+            // over the play area and the dice spill from its mouth. It pours from ABOVE the fence
+            // rather than through it — the walls are what keep dice on the table, so a pour that
+            // started outside one would just bounce off it.
             var cup = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             cup.name = "DiceCup";
             cup.transform.SetParent(root, false);
-            cup.transform.localPosition = new Vector3(0.46f, TableY + 0.075f, 0.30f);
-            cup.transform.localScale = new Vector3(0.14f, 0.075f, 0.14f);
+            cup.transform.localScale = new Vector3(0.15f, 0.085f, 0.15f);
             cup.GetComponent<Renderer>().material = Mat(new Color(0.31f, 0.28f, 0.42f));
-            RemoveCollider(cup); // sits outside the fence at x=0.46; dice can never reach it
+            RemoveCollider(cup); // dice pour THROUGH it; a collider would knock them aside
+            var cupView = cup.AddComponent<DiceCupView>();
+            cupView.Init(
+                restPosition: new Vector3(0.44f, TableY + 0.085f, -0.02f),
+                pourPosition: new Vector3(0.22f, TableY + 0.46f, RollZoneCenterZ - 0.04f),
+                pourRotation: Quaternion.Euler(0f, 0f, 118f));
 
             var box = GameObject.CreatePrimitive(PrimitiveType.Cube);
             box.name = "GameBox";
@@ -118,6 +120,7 @@ namespace Yahtzee.Presentation
             AddPencil(root, "OmaPencil", new Vector3(0.26f, TableY + 0.008f, 0.64f), 15f);
             // Your own pencil, resting beside your card on your side of the table.
             AddPencil(root, "PlayerPencil", new Vector3(0.31f, TableY + 0.008f, -0.46f), -22f);
+            return cupView;
         }
 
         /// <summary>The "?" on the mug, on a world-space canvas facing the player. No rotation:
@@ -311,13 +314,17 @@ namespace Yahtzee.Presentation
             // Invisible walls + ceiling pen the dice into the roll zone (TECH_PLAN §5.4). Walls
             // are centred half a thickness outside the zone so their inner faces are the bounds.
             const float t = 0.02f;
+            // Tall enough to contain the pour. The cup releases from about y = 0.46, and walls
+            // that stopped at 0.40 simply let the dice spill over the top and off the table.
+            const float wallHeight = 1.30f;
+            const float wallCentreY = 0.55f;
             float width = RollZoneHalfX * 2f + t;
             float depth = RollZoneMaxZ - RollZoneMinZ;
-            AddWall(root, "FenceLeft", new Vector3(-RollZoneHalfX - t / 2f, 0.15f, RollZoneCenterZ), new Vector3(t, 0.5f, depth));
-            AddWall(root, "FenceRight", new Vector3(RollZoneHalfX + t / 2f, 0.15f, RollZoneCenterZ), new Vector3(t, 0.5f, depth));
-            AddWall(root, "FenceFar", new Vector3(0f, 0.15f, RollZoneMaxZ + t / 2f), new Vector3(width, 0.5f, t));
-            AddWall(root, "FenceNear", new Vector3(0f, 0.15f, RollZoneMinZ - t / 2f), new Vector3(width, 0.5f, t));
-            AddWall(root, "FenceCeiling", new Vector3(0f, 0.42f, RollZoneCenterZ), new Vector3(width, t, depth));
+            AddWall(root, "FenceLeft", new Vector3(-RollZoneHalfX - t / 2f, wallCentreY, RollZoneCenterZ), new Vector3(t, wallHeight, depth));
+            AddWall(root, "FenceRight", new Vector3(RollZoneHalfX + t / 2f, wallCentreY, RollZoneCenterZ), new Vector3(t, wallHeight, depth));
+            AddWall(root, "FenceFar", new Vector3(0f, wallCentreY, RollZoneMaxZ + t / 2f), new Vector3(width, wallHeight, t));
+            AddWall(root, "FenceNear", new Vector3(0f, wallCentreY, RollZoneMinZ - t / 2f), new Vector3(width, wallHeight, t));
+            AddWall(root, "FenceCeiling", new Vector3(0f, 1.16f, RollZoneCenterZ), new Vector3(width, t, depth));
         }
 
         private static void AddWall(Transform root, string name, Vector3 center, Vector3 size)
@@ -352,7 +359,8 @@ namespace Yahtzee.Presentation
             fillLight.intensity = 0.35f;
         }
 
-        private static DiceView3D BuildDice(Transform root, GameController controller, Camera camera)
+        private static DiceView3D BuildDice(Transform root, GameController controller, Camera camera,
+            DiceCupView cup)
         {
             var view = root.gameObject.AddComponent<DiceView3D>();
             var dice = new Die3D[DiceState.DieCount];
@@ -382,6 +390,10 @@ namespace Yahtzee.Presentation
                 // Speculative CCD: fast enough for small dice and legal on kinematic bodies
                 // (dice toggle kinematic constantly for keeps/guided settling).
                 rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+                // Cap how hard PhysX can eject a die that starts overlapping something.
+                // Uncapped, a pour that births two dice inside each other launches one
+                // clean off the table.
+                rb.maxDepenetrationVelocity = 1.5f;
                 rb.isKinematic = true;
 
                 var die = go.AddComponent<Die3D>();
@@ -391,7 +403,7 @@ namespace Yahtzee.Presentation
                 dice[i] = die;
             }
 
-            view.Init(dice, camera, controller, ThrowOrigin, restSlots, keepSlots, keepMarkers);
+            view.Init(dice, camera, controller, cup, restSlots, keepSlots, keepMarkers);
             view.InitMaterials(faceMat, pipMat);
             return view;
         }

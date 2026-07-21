@@ -1,9 +1,9 @@
 # Handoff — Yahtzee with Oma
 
 **Last updated:** 2026-07-20
-**Status:** M1–M3 complete, **M4 ~75%**. The game is fully playable end-to-end in the 3D kitchen scene vs. an auto-playing Oma, and the scorecard is now a physical object on the table.
+**Status:** M1–M3 complete, **M4 ~90%** (only the real art pass is left). The game is fully playable end-to-end in the 3D kitchen scene vs. an auto-playing Oma, and the scorecard is now a physical object on the table.
 **Test baseline (must stay green):** EditMode **101**, PlayMode **24**. Run them with `Tools\run-tests.ps1` — no need to close the editor.
-**Next task:** M4 finish — see [What's left](#whats-left), item 1 (cup pour).
+**Next task:** M5 — Oma's dialogue. See [What's left](#whats-left).
 
 ---
 
@@ -123,6 +123,7 @@ Results XML parses with `[xml]$r = Get-Content out.xml; $r."test-run"` → `tota
 
 - **`GameController`** — owns engine, subscribes to events, sequences everything. Input entry points: `OnRollTapped`, `OnDieTapped`, `OnCellTapped`, `OnSkipTapped`, `OnPeekTapped`, `OnNewGameTapped`. Two static flags: **`AnimationsEnabled`** (tests set false → everything instant) and **`Use3dDice`** (false → the 2D layer, kept per TECH_PLAN §7).
 - **`IDiceView`** — `SetDice` / `PlayRoll` / `SetInteractable` / `SkipAnimation`. Two implementations:
+  - `DiceCupView` — the cup lifts, tips over the play area and spills the dice from its mouth (design §5.4). Pours from *above* the fence, so the walls had to grow to contain it.
   - `DiceView3D` + `Die3D` — physics dice, **engine value decided first**, guided settle, watchdog snap, raycast tap-to-keep. Kept dice move to the keep row *and* light a gold pad (design §5.5 forbids colour-only signalling); rolled dice are penned into the roll zone so values stay trackable.
   - `DiceView2D` + `DieView2D` — sprite fallback behind the debug flag.
 - **`KitchenBuilder`** — builds the whole gray-box scene in code (table, fence, lamp + fill light, props, dice, the diegetic scorecard, Oma, camera framings). Real art replaces primitives here.
@@ -197,9 +198,8 @@ Results XML parses with `[xml]$r = Get-Content out.xml; $r."test-run"` → `tota
 
 ### M4 finish (current milestone)
 
-1. **Cup pour** — dice currently spawn beside the cup. They should launch from inside it with a tip/pour animation (`KitchenBuilder.CupPosition`, `DiceView3D.PlayRoll`). Note the launch point had to move *inside* the fence when the roll zone tightened; the cup **prop** still sits outside it at x = 0.46, so this needs the prop moved (or the zone widened) rather than just re-pointing the spawn.
-2. **Real art pass** — swap gray-box primitives for the low-poly kitchen; **Oma is a purple-tinted placeholder mannequin** right now. Note: her FBX import extracted real textures (`Assets/Resources/Oma/Ch36_*.png`) that are currently unused — wiring those up is a quick interim improvement over the purple tint. The scorecard also still reads as a dark UI panel rather than paper (unlit UI shader, `UiPalette.Panel` border) — worth a pass here. Re-run `FramingCaptureTests` after any art change.
-3. **Android device build** — **the game builds, installs and runs on a Pixel 10 Pro** (IL2CPP/ARM64), verified by a screenshot pulled off the device: 3D scene, dice, gold keep pads and the diegetic card all render correctly in portrait. That clears the long-outstanding **M2 exit criterion**. Still to do: **60 fps check**, safe-area on a real notch, and a **touch input pass**.
+1. **Real art pass** — swap gray-box primitives for the low-poly kitchen; **Oma is a purple-tinted placeholder mannequin** right now. Note: her FBX import extracted real textures (`Assets/Resources/Oma/Ch36_*.png`) that are currently unused — wiring those up is a quick interim improvement over the purple tint. The scorecard also still reads as a dark UI panel rather than paper (unlit UI shader, `UiPalette.Panel` border) — worth a pass here. Re-run `FramingCaptureTests` after any art change.
+2. **Android device build** — **the game builds, installs and runs on a Pixel 10 Pro** (IL2CPP/ARM64), verified by a screenshot pulled off the device: 3D scene, dice, gold keep pads and the diegetic card all render correctly in portrait. That clears the long-outstanding **M2 exit criterion**. Still to do: **60 fps check**, safe-area on a real notch, and a **touch input pass**.
 
    **Real touch is still unverified.** Every automated test drives `GameController` or `DiceView3D.DieAtScreenPoint` directly, so nothing exercises input through the EventSystem — in particular scorecard cell taps via the world-space `GraphicRaycaster`, and whether `IsPointerOverUi` correctly stops a tap on the card from also reaching the dice underneath. That is the same blind spot that hid the dice-tap bug for all of M4, so sit with the device and tap every control.
 
