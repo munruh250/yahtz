@@ -86,8 +86,11 @@ Start-Sleep -Seconds $RunSeconds
 $log = Join-Path $Testbed "device-logcat.txt"
 & $adb logcat -d -v brief > $log
 
-$problems = Get-Content $log | Select-String -Pattern "E/Unity" |
-            Select-String -Pattern "Exception|Error:|error CS"
+# ANY error-level Unity line is a failure. An earlier, laxer filter only looked for
+# "Exception" and sailed past "Can't add component because class 'CapsuleCollider' doesn't
+# exist!" -- a stripping bug that was spamming five errors per launch. A clean launch produces
+# no E/Unity lines whatsoever, so that is the bar.
+$problems = Get-Content $log | Select-String -Pattern "E/Unity"
 if ($problems) {
     Write-Host "DEVICE SMOKE FAILED -- exceptions in logcat:"
     Get-Content $log | Select-String -Pattern "E/Unity" | Select-Object -First 40 | ForEach-Object { $_.Line }

@@ -73,7 +73,7 @@ namespace Yahtzee.Presentation
             // Releasing a kept die drops it back on its rest slot, which another die may have
             // drifted onto during the throw — so re-separate whenever anything was placed.
             if (placed)
-                Unstack();
+                CommitPositions();
         }
 
         public void PlayRoll(int[] values, bool[] kept, Action onSettled)
@@ -172,10 +172,24 @@ namespace Yahtzee.Presentation
             foreach (var die in _dice)
                 if (die.gameObject.activeSelf && !die.Settled)
                     return;
-            Unstack();
+            CommitPositions();
             var settled = _pendingSettled;
             _pendingSettled = null;
             settled();
+        }
+
+        /// <summary>Separate any overlapping dice, then push the new transforms into the physics
+        /// scene.
+        ///
+        /// The sync is not optional: this project has Auto Sync Transforms **off**
+        /// (`m_AutoSyncTransforms: 0`), so moving a die's Transform leaves its collider at the
+        /// old position until the next FixedUpdate. Tap picking raycasts the physics scene, so
+        /// without this a tap immediately after keeping or releasing a die would be tested
+        /// against where the dice used to be — hitting the wrong die, or nothing.</summary>
+        private void CommitPositions()
+        {
+            Unstack();
+            Physics.SyncTransforms();
         }
 
         /// <summary>Push apart any loose dice that ended up overlapping.

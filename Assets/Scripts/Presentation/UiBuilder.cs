@@ -79,6 +79,12 @@ namespace Yahtzee.Presentation
 
         private static void BuildHeaderAndStatus(RectTransform parent, out TextMeshProUGUI header, out TextMeshProUGUI status)
         {
+            // Scrim first, so it sits behind the text. The kitchen wall behind Oma is pale, and
+            // cream-on-plaster washed the round/score line out completely once the room went in.
+            var scrim = Image(parent, "TopScrim", new Vector2(0f, 0.885f), new Vector2(1f, 1f),
+                new Color(0.10f, 0.07f, 0.05f, 0.55f));
+            scrim.raycastTarget = false; // must never swallow a tap
+
             header = Text(parent, "Header", "", 44f, UiPalette.Cream, TextAlignmentOptions.MidlineLeft,
                 new Vector2(0.02f, 0.945f), new Vector2(0.74f, 0.995f));
             header.fontStyle = FontStyles.Bold;

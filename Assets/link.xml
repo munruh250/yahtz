@@ -1,0 +1,19 @@
+<!--
+  IL2CPP engine-code stripping (`stripEngineCode`, on by default for Android) drops engine
+  classes the managed code never *names*. Nothing in this project names CapsuleCollider — but
+  GameObject.CreatePrimitive attaches one to every Cylinder it builds, and the cup, mug, both
+  pencils and the five keep markers are cylinders.
+
+  Without this the device log fills with "Can't add component because class 'CapsuleCollider'
+  doesn't exist!", and earlier it did worse: dereferencing the collider that was never added
+  threw inside KitchenBuilder.Build and left the entire 3D scene unbuilt while the flat UI still
+  drew (see Docs/HANDOFF.md section 2).
+
+  We do not actually want the collider — every cylinder deletes it immediately — but
+  CreatePrimitive insists on adding one, so the class has to survive into the build.
+-->
+<linker>
+  <assembly fullname="UnityEngine.PhysicsModule">
+    <type fullname="UnityEngine.CapsuleCollider" preserve="all" />
+  </assembly>
+</linker>

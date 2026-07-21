@@ -36,7 +36,9 @@ EditMode and PlayMode run **inside the editor**, where nothing is stripped and e
 
 **The trap that caused it:** with `stripEngineCode: 1` (the Android default), IL2CPP removes engine types the managed code never *names*. Nothing referenced `CapsuleCollider` — the collider Unity puts on a `Cylinder` primitive — so on device `CreatePrimitive(PrimitiveType.Cylinder)` came back with **no collider at all**, and `GetComponent<Collider>().material` threw. Null-check any component you did not add yourself, and remember that naming a type only in a comment does not keep it.
 
-**A desktop player is not a proxy.** Stripping is per-platform: a Windows build booted perfectly clean on the exact code that crashed on the phone. Believe nothing about the device that was not run on the device.
+`Assets/link.xml` now preserves **`CapsuleCollider`** for exactly this reason: `CreatePrimitive(Cylinder)` attaches one to the cup, mug, both pencils and the five keep markers, so with it stripped every launch logged *"Can't add component because class 'CapsuleCollider' doesn't exist!"* five times over. Add a `<type>` entry there for any engine class only Unity itself references.
+
+**A desktop player is not a proxy.** Stripping is per-platform: a Windows build booted perfectly clean on the exact code that crashed on the phone. Believe nothing about the device that was not run on the device. `device-smoke.ps1` fails on **any** `E/Unity` line — a clean launch produces none, and an earlier laxer filter that only looked for "Exception" sailed straight past the CapsuleCollider spam.
 
 ```powershell
 Tools\device-smoke.ps1 -ListDevices   # is a device attached and authorised?
@@ -203,7 +205,7 @@ Title / Results / Pause screens (only a game-over panel exists) · audio (`Audio
 
 ### Loose ends
 
-- Strip unused template modules (terrain, vehicles, XR) — cleanup, not urgent.
+- Strip unused template modules (terrain, vehicles, XR) — cleanup, not urgent. **Adaptive Performance is already gone**: it was never in `manifest.json` directly but came via `com.unity.feature.mobile`, which is why removing it in Package Manager never stuck — the feature set re-added it on every resolve. Removing the feature set took Adaptive Performance, mobile-notifications and android-logcat with it.
 - **EventSystem leak across scene loads** (pre-existing, surfaced by the new tests). `UiBuilder.EnsureEventSystem` tags the object `HideFlags.DontSave`, which also means "survives scene load", so each reload adds another and Unity logs *"There are N event systems in the scene"*. Harmless today (the game loads its scene once) but it will bite in M6 when Title ⇄ Game navigation lands, and multiple EventSystems break input.
 - Final game name / trademark review — before store submission.
 
