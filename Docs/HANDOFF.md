@@ -25,7 +25,10 @@ C:\Program Files\Unity\Hub\Editor\2022.3.62f3-x86_64\Editor\Unity.exe
 
 Worth repairing via Unity Hub eventually; not blocking.
 
-**Android Build Support is NOT installed** — the editor has only `windowsstandalonesupport`, so Build Settings won't offer Android at all. Before the device build (M4 item 3): Unity Hub → Installs → gear on the **`-x86_64`** install → Add Modules → Android Build Support + SDK & NDK Tools + OpenJDK. A real Pixel over USB beats an emulator here — touch, 60 fps and safe-area all need real hardware.
+**Android device builds.** Build Support + SDK/NDK/OpenJDK are installed under the `-x86_64` editor; `adb` lives at `Editor\Data\PlaybackEngines\AndroidPlayer\SDK\platform-tools\adb.exe` and is the fastest way to triage a device that Unity won't list. Target device is a **Pixel 10 Pro** (ARM64). Two traps already hit:
+
+- *"No Android devices connected"* with the phone plugged in — check `adb devices` against `Get-PnpDevice`. Windows showing the phone as class **WPD** while adb lists **nothing** means USB debugging is off (Developer options, *not* the USB-preferences menu — USB tethering is unrelated and shares mobile data instead). Serial listed as `unauthorized` instead means the on-phone RSA prompt was dismissed.
+- *"trying to install ARMv7 APK to ARM64 device"* — Unity's Android defaults are Mono + ARMv7. `SceneBootstrapper.ConfigurePlayerSettings` now forces IL2CPP + ARM64 per CLAUDE.md (ARM64 is only offered under IL2CPP, so the backend must be set first). Re-run `Yahtzee/Setup Project` if the settings ever drift back.
 
 ### Running tests without closing the editor
 

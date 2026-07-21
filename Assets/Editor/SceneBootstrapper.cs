@@ -1,4 +1,5 @@
 using UnityEditor;
+using UnityEditor.Build;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using Yahtzee.Presentation;
@@ -62,6 +63,13 @@ namespace Yahtzee.EditorTools
             PlayerSettings.allowedAutorotateToPortraitUpsideDown = false;
             PlayerSettings.allowedAutorotateToLandscapeLeft = false;
             PlayerSettings.allowedAutorotateToLandscapeRight = false;
+
+            // CLAUDE.md: IL2CPP/ARM64. Unity's Android defaults are Mono + ARMv7, which builds an
+            // APK no modern phone will install ("trying to install ARMv7 APK to ARM64 device") and
+            // that Google Play rejects outright. ARM64 is only offered under IL2CPP, so the
+            // backend has to be set first or the architecture assignment is clamped back.
+            PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
+            PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
         }
     }
 }
