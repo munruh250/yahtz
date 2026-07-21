@@ -55,41 +55,84 @@ namespace Yahtzee.Presentation
             safe.gameObject.AddComponent<SafeAreaFitter>();
 
             var refs = new Refs();
-            BuildHeaderAndStatus(safe, out var header, out var status);
+            BuildHeaderAndStatus(safe, out var header, out var status, out var menuButton, out var menuPanel);
             if (!worldDice)
             {
                 refs.Dice = BuildDiceRow(safe, controller);
                 refs.Scorecard = BuildScorecard(safe, controller);
             }
-            BuildActionBar(safe, controller, out var rollButton, out var rollLabel, out var askButton);
+            BuildRollBar(safe, controller, out var rollButton, out var rollLabel, out var rollPips);
             refs.SpeechBubble = BuildSpeechBubble(safe);
 
             // Sibling order = raycast/draw order: skip overlay above the play surface,
-            // peek toggle above the overlay, game-over scrim above everything.
+            // game-over scrim above everything.
             var skipOverlay = BuildSkipOverlay(safe, controller);
+            BuildMenuPanel(menuPanel, controller);
             BuildGameOver(safe, controller, out var gameOverPanel, out var gameOverText);
 
             refs.Hud = safe.gameObject.AddComponent<HudView>();
-            refs.Hud.Init(rollButton, rollLabel, status, header, gameOverPanel, gameOverText,
-                skipOverlay, askButton);
+            refs.Hud.Init(rollButton, rollLabel, rollPips, status, header, gameOverPanel, gameOverText,
+                skipOverlay, menuButton, menuPanel);
             return refs;
         }
 
         // ---- Zones ---------------------------------------------------------
 
-        private static void BuildHeaderAndStatus(RectTransform parent, out TextMeshProUGUI header, out TextMeshProUGUI status)
+        /// <summary>Top strip: round and running totals on a solid bar, with everything that is
+        /// not part of playing a turn tucked behind a hamburger.</summary>
+        private static void BuildHeaderAndStatus(RectTransform parent, out TextMeshProUGUI header,
+            out TextMeshProUGUI status, out Button menuButton, out GameObject menuPanel)
         {
-            // Scrim first, so it sits behind the text. The kitchen wall behind Oma is pale, and
-            // cream-on-plaster washed the round/score line out completely once the room went in.
-            var scrim = Image(parent, "TopScrim", new Vector2(0f, 0.885f), new Vector2(1f, 1f),
-                new Color(0.10f, 0.07f, 0.05f, 0.55f));
-            scrim.raycastTarget = false; // must never swallow a tap
+            // A solid bar, not a scrim: the kitchen wall behind Oma is pale, and cream-on-plaster
+            // washed the round/score line out completely once the room went in.
+            // The status line lives INSIDE the bar. Left loose over the room it sat across the
+            // window and a wall sampler, and gold-on-plaster was barely readable.
+            var bar = Image(parent, "TopBar", new Vector2(0f, 0.876f), new Vector2(1f, 1f), UiPalette.BarDeep);
+            bar.raycastTarget = false;
 
-            header = Text(parent, "Header", "", 44f, UiPalette.Cream, TextAlignmentOptions.MidlineLeft,
-                new Vector2(0.02f, 0.945f), new Vector2(0.74f, 0.995f));
+            header = Text(bar.rectTransform, "Header", "", 42f, UiPalette.Cream, TextAlignmentOptions.MidlineLeft,
+                new Vector2(0.04f, 0.42f), new Vector2(0.82f, 1f));
             header.fontStyle = FontStyles.Bold;
-            status = Text(parent, "Status", "", 38f, UiPalette.Gold, TextAlignmentOptions.Center,
-                new Vector2(0.02f, 0.90f), new Vector2(0.98f, 0.945f));
+
+            var menuBg = Image(parent, "MenuButton", new Vector2(0.855f, 0.94f), new Vector2(0.985f, 0.995f), UiPalette.BarLight);
+            menuButton = menuBg.gameObject.AddComponent<Button>();
+            menuButton.targetGraphic = menuBg;
+            Text(menuBg.rectTransform, "Glyph", "≡", 54f, UiPalette.Cream, TextAlignmentOptions.Center,
+                Vector2.zero, Vector2.one).fontStyle = FontStyles.Bold;
+
+            status = Text(bar.rectTransform, "Status", "", 32f, UiPalette.Gold, TextAlignmentOptions.Center,
+                new Vector2(0.03f, 0.02f), new Vector2(0.97f, 0.42f));
+
+            menuPanel = Rect(parent, "MenuPanel", new Vector2(0.52f, 0.64f), new Vector2(0.985f, 0.872f)).gameObject;
+            menuPanel.SetActive(false);
+        }
+
+        /// <summary>Everything that is not "play this turn": restart, and the M6 placeholders.</summary>
+        private static void BuildMenuPanel(GameObject panel, GameController controller)
+        {
+            var rect = (RectTransform)panel.transform;
+            Image(rect, "Backing", Vector2.zero, Vector2.one, UiPalette.BarDeep);
+
+            AddMenuRow(rect, "New Game", 0, UiPalette.Gold, UiPalette.Ink, controller.OnNewGameTapped);
+            AddMenuRow(rect, "Settings", 1, UiPalette.BarLight, UiPalette.CreamDim, null);
+            AddMenuRow(rect, "Store", 2, UiPalette.BarLight, UiPalette.CreamDim, null);
+        }
+
+        private static void AddMenuRow(RectTransform parent, string label, int index, Color background,
+            Color textColor, UnityEngine.Events.UnityAction onClick)
+        {
+            const float rows = 3f;
+            float top = 1f - (index + 0.12f) / rows;
+            float bottom = 1f - (index + 0.92f) / rows;
+            var bg = Image(parent, label, new Vector2(0.06f, bottom), new Vector2(0.94f, top), background);
+            var button = bg.gameObject.AddComponent<Button>();
+            button.targetGraphic = bg;
+            if (onClick != null)
+                button.onClick.AddListener(onClick);
+            else
+                button.interactable = false; // wired up in M6
+            Text(bg.rectTransform, "Label", label, 34f, textColor, TextAlignmentOptions.Center,
+                Vector2.zero, Vector2.one).fontStyle = FontStyles.Bold;
         }
 
         private static DiceView2D BuildDiceRow(RectTransform parent, GameController controller)
@@ -127,7 +170,7 @@ namespace Yahtzee.Presentation
 
         private static ScorecardView BuildScorecard(RectTransform parent, GameController controller)
         {
-            var outer = Image(parent, "Scorecard", new Vector2(0.02f, 0.115f), new Vector2(0.98f, 0.77f), UiPalette.Panel).rectTransform;
+            var outer = Image(parent, "Scorecard", new Vector2(0.02f, 0.115f), new Vector2(0.98f, 0.77f), UiPalette.Paper).rectTransform;
             return ScorecardBuilder.BuildInto(outer, controller);
         }
 
@@ -141,34 +184,31 @@ namespace Yahtzee.Presentation
             return overlay.gameObject;
         }
 
-        private static void BuildActionBar(RectTransform parent, GameController controller,
-            out Button rollButton, out TextMeshProUGUI rollLabel, out Button askButton)
+        /// <summary>One primary action across the whole bottom edge. Rolling is the only thing
+        /// you do from the HUD now — keeping dice, scoring and asking Oma are all taps on the
+        /// table itself, so the bar carries a single unmissable target.</summary>
+        private static void BuildRollBar(RectTransform parent, GameController controller,
+            out Button rollButton, out TextMeshProUGUI rollLabel, out Image[] pips)
         {
-            var bar = Rect(parent, "ActionBar", new Vector2(0.02f, 0.005f), new Vector2(0.98f, 0.105f));
-
-            // Roll stays the widest — it is the primary action. Ask Oma sits beside it; New Game
-            // is rare and destructive, so it gets the smallest, furthest target.
-            var rollBg = Image(bar, "RollButton", new Vector2(0f, 0.08f), new Vector2(0.45f, 0.95f), UiPalette.Gold);
+            var rollBg = Image(parent, "RollButton", new Vector2(0.02f, 0.012f), new Vector2(0.98f, 0.108f), UiPalette.Gold);
             rollButton = rollBg.gameObject.AddComponent<Button>();
             rollButton.targetGraphic = rollBg;
             rollButton.onClick.AddListener(controller.OnRollTapped);
-            rollLabel = Text(rollBg.rectTransform, "Label", "Roll", 52f, UiPalette.Ink, TextAlignmentOptions.Center,
-                Vector2.zero, Vector2.one);
+
+            rollLabel = Text(rollBg.rectTransform, "Label", "ROLL", 58f, UiPalette.Ink, TextAlignmentOptions.Center,
+                new Vector2(0.06f, 0f), new Vector2(0.62f, 1f));
             rollLabel.fontStyle = FontStyles.Bold;
 
-            var askBg = Image(bar, "AskOmaButton", new Vector2(0.48f, 0.08f), new Vector2(0.79f, 0.95f), UiPalette.GoldSoft);
-            askButton = askBg.gameObject.AddComponent<Button>();
-            askButton.targetGraphic = askBg;
-            askButton.onClick.AddListener(controller.OnAskOmaTapped);
-            Text(askBg.rectTransform, "Label", "Ask Oma", 38f, UiPalette.Ink, TextAlignmentOptions.Center,
-                Vector2.zero, Vector2.one).fontStyle = FontStyles.Bold;
-
-            var newBg = Image(bar, "NewGameButton", new Vector2(0.82f, 0.08f), new Vector2(1f, 0.95f), UiPalette.Panel);
-            var newButton = newBg.gameObject.AddComponent<Button>();
-            newButton.targetGraphic = newBg;
-            newButton.onClick.AddListener(controller.OnNewGameTapped);
-            Text(newBg.rectTransform, "Label", "New\nGame", 26f, UiPalette.Cream, TextAlignmentOptions.Center,
-                Vector2.zero, Vector2.one);
+            // Three squares rather than glyphs in the label: drawn pips are legible at a glance
+            // and cannot fall foul of a font missing the character.
+            pips = new Image[3];
+            for (int i = 0; i < pips.Length; i++)
+            {
+                float x0 = 0.66f + i * 0.10f;
+                pips[i] = Image(rollBg.rectTransform, $"Pip{i}", new Vector2(x0, 0.30f), new Vector2(x0 + 0.075f, 0.70f),
+                    UiPalette.Ink);
+                pips[i].raycastTarget = false;
+            }
         }
 
         /// <summary>Oma's speech bubble, sitting under her in the top zone (design §5.2). Nothing

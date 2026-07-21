@@ -25,9 +25,9 @@ namespace Yahtzee.Tests
         private const float FenceZ = -0.38f;
         private const float TableNearZ = -0.85f;
 
-        /// <summary>Top of the screen-space action bar (UiBuilder). The card is drawn by the
+        /// <summary>Top of the screen-space roll bar (UiBuilder). The card is drawn by the
         /// camera and the bar overlays it, so anything below this line is simply not readable.</summary>
-        private const float ActionBarTop = 0.105f;
+        private const float ActionBarTop = 0.108f;
 
         [SetUp]
         public void SetUp()
@@ -83,27 +83,20 @@ namespace Yahtzee.Tests
             Assert.GreaterOrEqual(minZ, TableNearZ, "the card must not hang off the near edge of the table");
         }
 
-        /// <summary>The contract a physical card creates: the player may tap a box from any
-        /// framing the camera rests in during Deciding — after a roll (Default) and once the
-        /// rolls are spent (ScorecardFocus) — so both must show all 13 boxes, clear of the
-        /// action bar, at a readable size. DiceFocus is exempt: it is the roll's push-in and
-        /// GameController eases off it the moment the dice settle.</summary>
+        /// <summary>The contract a physical card creates: the player taps boxes on it, so the
+        /// one fixed camera must show all 13, clear of the roll bar, at a readable size.</summary>
         [UnityTest]
         public IEnumerator Card_IsFullyVisibleAndLegibleInEveryScoringFraming()
         {
             yield return LoadGameScene();
             var camera = Camera.main;
             camera.aspect = ReferenceWidth / ReferenceHeight; // judge against the target device, not the runner window
-            var director = Object.FindAnyObjectByType<CameraDirector>();
             var card = (RectTransform)FindCardCanvas().transform;
             var cell = (RectTransform)FindCardCanvas().GetComponentInChildren<ScoreCellView>().transform;
             var corners = new Vector3[4];
 
-            foreach (var framing in new[] { CameraDirector.Framing.Default, CameraDirector.Framing.ScorecardFocus })
             {
-                director.Set(framing, instant: true);
-                yield return null;
-
+                const string framing = "fixed camera";
                 card.GetWorldCorners(corners);
                 ReportSpan(framing, camera, corners);
                 foreach (var corner in corners)
@@ -134,7 +127,6 @@ namespace Yahtzee.Tests
             var camera = Camera.main;
             camera.aspect = ReferenceWidth / ReferenceHeight;
             var controller = Object.FindAnyObjectByType<GameController>();
-            var director = Object.FindAnyObjectByType<CameraDirector>();
 
             // Roll, then keep two dice so both the roll zone and the keep row are populated.
             controller.OnRollTapped();
@@ -147,16 +139,8 @@ namespace Yahtzee.Tests
 
             var quad = new Vector2[4];
             var corners = new Vector3[4];
-            foreach (var framing in new[]
-                     {
-                         CameraDirector.Framing.Default,
-                         CameraDirector.Framing.ScorecardFocus,
-                         CameraDirector.Framing.DiceFocus,
-                     })
             {
-                director.Set(framing, instant: true);
-                yield return null;
-
+                const string framing = "fixed camera";
                 ((RectTransform)FindCardCanvas().transform).GetWorldCorners(corners);
                 for (int i = 0; i < 4; i++)
                     quad[i] = camera.WorldToViewportPoint(corners[i]);
@@ -197,7 +181,7 @@ namespace Yahtzee.Tests
 
         /// <summary>Prints where the card actually lands, so retuning the framings is a matter of
         /// reading numbers off a test run rather than guessing at camera geometry.</summary>
-        private static void ReportSpan(CameraDirector.Framing framing, Camera camera, Vector3[] corners)
+        private static void ReportSpan(string framing, Camera camera, Vector3[] corners)
         {
             float minX = float.MaxValue, maxX = float.MinValue, minY = float.MaxValue, maxY = float.MinValue;
             foreach (var corner in corners)

@@ -38,7 +38,6 @@ namespace Yahtzee.Presentation
         private ScorecardView _scorecard;
         private HudView _hud;
         private SpeechBubbleView _speech;
-        private CameraDirector _cameraDirector; // null in 2D mode
         private OmaView _omaView;               // null in 2D mode or before assets import
 
         private Category? _selected;   // player's pending confirm, or Oma's flash
@@ -58,7 +57,6 @@ namespace Yahtzee.Presentation
                 // In 3D the card is a physical object on the table, so the kitchen owns it.
                 var kitchen = KitchenBuilder.Build(transform, this, Camera.main);
                 _dice = kitchen.Dice;
-                _cameraDirector = kitchen.CameraDirector;
                 _scorecard = kitchen.Scorecard;
                 _omaView = kitchen.Oma;
             }
@@ -93,6 +91,7 @@ namespace Yahtzee.Presentation
             _toast = null;
             InputLocked = false;
             _hud.HideGameOver();
+            _hud.CloseMenu();
             _speech.Hide(); // a hint about the previous game's dice would be nonsense
             RefreshAll();
 
@@ -274,7 +273,6 @@ namespace Yahtzee.Presentation
             switch (gameEvent)
             {
                 case DiceRolled rolled:
-                    _cameraDirector?.Set(CameraDirector.Framing.DiceFocus);
                     _dice.PlayRoll(rolled.Values, Engine.State.Dice.Kept, OnDiceSettled);
                     break;
                 case JokerActivated joker:
@@ -291,16 +289,12 @@ namespace Yahtzee.Presentation
                 case TurnChanged turn:
                     SaveService.Save(Engine.State);
                     _peekOther = false;
-                    _cameraDirector?.Set(turn.Player == PlayerId.Oma
-                        ? CameraDirector.Framing.OmaFocus
-                        : CameraDirector.Framing.Default);
                     RefreshAll();
                     if (IsOmaTurn && _omaRoutine == null)
                         _omaRoutine = StartCoroutine(OmaTurnRoutine());
                     break;
                 case GameEnded ended:
                     SaveService.Save(Engine.State);
-                    _cameraDirector?.Set(CameraDirector.Framing.OmaFocus);
                     RefreshAll();
                     _hud.ShowGameOver(ended);
                     break;
@@ -316,9 +310,6 @@ namespace Yahtzee.Presentation
             // spent (with best-option hints, computed in RefreshAll), otherwise to the framing
             // that reads dice and card together.
             if (!IsOmaTurn && Engine.State.Phase == GamePhase.Deciding)
-                _cameraDirector?.Set(Engine.RollsRemaining == 0
-                    ? CameraDirector.Framing.ScorecardFocus
-                    : CameraDirector.Framing.Default);
             RefreshAll();
         }
 
@@ -362,7 +353,6 @@ namespace Yahtzee.Presentation
             _hud.SetRoll(!InputLocked && !IsOmaTurn && state.Phase != GamePhase.GameOver && Engine.RollsRemaining > 0,
                 Engine.RollsRemaining);
             _hud.SetOmaTurn(IsOmaTurn);
-            _hud.SetAskOma(CanAskOma);
             _dice.SetDice(state.Dice.Values, state.Dice.Kept);
             _dice.SetInteractable(!InputLocked && !IsOmaTurn && deciding && Engine.RollsRemaining > 0);
             _scorecard.Render(displayedCard, potentials, _selected, suggested);

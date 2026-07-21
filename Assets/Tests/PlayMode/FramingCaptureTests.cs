@@ -42,9 +42,7 @@ namespace Yahtzee.Tests
             yield return null;
 
             var controller = Object.FindAnyObjectByType<GameController>();
-            var director = Object.FindAnyObjectByType<CameraDirector>();
             Assert.IsNotNull(controller);
-            Assert.IsNotNull(director);
 
             // Turn start: empty table.
             Capture("0-turnstart-default");
@@ -69,18 +67,8 @@ namespace Yahtzee.Tests
             yield return null;
             Capture("3-roll3-scorecardfocus");
 
-            // Explicit framings for review regardless of game flow.
-            director.Set(CameraDirector.Framing.Default, instant: true);
-            yield return null;
-            Capture("4-default");
-            director.Set(CameraDirector.Framing.DiceFocus, instant: true);
-            yield return null;
-            Capture("5-dicefocus");
-            director.Set(CameraDirector.Framing.OmaFocus, instant: true);
-            yield return null;
-            Capture("6-omafocus");
 
-            Assert.IsTrue(File.Exists(Path.Combine(OutDir, "4-default.png")));
+            Assert.IsTrue(File.Exists(Path.Combine(OutDir, "3-roll3-scorecardfocus.png")));
         }
 
         private static void Capture(string name)

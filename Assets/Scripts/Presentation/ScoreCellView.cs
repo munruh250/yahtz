@@ -28,16 +28,16 @@ namespace Yahtzee.Presentation
 
         public void ShowLocked(int score)
         {
-            _background.color = UiPalette.Cream;
+            _background.color = UiPalette.Paper;
             _value.text = score.ToString();
-            _value.color = UiPalette.Ink;
+            _value.color = UiPalette.InkDark;
             _value.fontStyle = FontStyles.Bold;
             _button.interactable = false;
         }
 
         public void ShowOpen(int? ghostScore, bool selectable)
         {
-            _background.color = selectable ? UiPalette.Cream : UiPalette.CreamDim;
+            _background.color = selectable ? UiPalette.Paper : UiPalette.PaperShade;
             _value.text = ghostScore?.ToString() ?? "";
             _value.color = UiPalette.InkGhost;
             _value.fontStyle = FontStyles.Normal;
@@ -49,7 +49,7 @@ namespace Yahtzee.Presentation
         {
             _background.color = UiPalette.GoldSoft;
             _value.text = ghostScore.ToString();
-            _value.color = UiPalette.Ink;
+            _value.color = UiPalette.InkDark;
             _value.fontStyle = FontStyles.Bold;
             _button.interactable = true;
         }
@@ -58,7 +58,7 @@ namespace Yahtzee.Presentation
         {
             _background.color = UiPalette.Gold;
             _value.text = ghostScore.ToString();
-            _value.color = UiPalette.Ink;
+            _value.color = UiPalette.InkDark;
             _value.fontStyle = FontStyles.Bold;
             _button.interactable = true;
         }

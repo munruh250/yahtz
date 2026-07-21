@@ -12,7 +12,6 @@ namespace Yahtzee.Presentation
         public sealed class Refs
         {
             public DiceView3D Dice;
-            public CameraDirector CameraDirector;
             /// <summary>The diegetic card on the table — the interactive scorecard in 3D mode.</summary>
             public ScorecardView Scorecard;
             /// <summary>Null until the Oma FBX assets have been imported (setup tool).</summary>
@@ -31,7 +30,7 @@ namespace Yahtzee.Presentation
         /// <summary>Inner faces of the fence — the patch rolled dice must come to rest in.</summary>
         public const float RollZoneHalfX = 0.31f;
         public const float RollZoneMinZ = 0.10f;
-        public const float RollZoneMaxZ = 0.38f;
+        public const float RollZoneMaxZ = 0.30f;
         /// <summary>Kept dice line up here, between the roll zone and the card. The card's raised
         /// top edge hides table level behind about z = -0.19 at the tightest framing, so the row
         /// sits well forward of that — the gold pads are wider than the dice and clip first.</summary>
@@ -63,26 +62,11 @@ namespace Yahtzee.Presentation
             // before rolling or after your rolls are spent, unlike the dice.
             if (controller != null)
                 root.gameObject.AddComponent<WorldTapInput>()
-                    .Init(camera, () => !controller.InputLocked && !controller.IsOmaTurn);
+                    .Init(camera, controller, () => !controller.InputLocked && !controller.IsOmaTurn);
 
-            var director = root.gameObject.AddComponent<CameraDirector>();
-            director.Init(camera, new[]
-            {
-                // pos, lookAt, fov — portrait framings tuned against the concept mockup via the
-                // FramingCapture renders. Default and ScorecardFocus are the two the player
-                // scores from, so both frame the whole card (see WorldScorecardTests); DiceFocus
-                // is the transient push-in during a roll and is free to crop it.
-                // Default is the scoring-capable framing (see GameController.OnDiceSettled), so
-                // it sits back far enough to hold Oma, the dice and the whole card at once.
-                (new Vector3(0f, 1.45f, -1.60f), new Vector3(0f, -0.02f, 0.25f), 58f), // Default
-                (new Vector3(0f, 1.00f, -0.95f), new Vector3(0f, -0.12f, 0.06f), 56f), // DiceFocus
-                // ScorecardFocus sits back and aims high so the diegetic card lands in the
-                // bottom third, fully inside the frustum and clear of the action bar.
-                (new Vector3(0f, 1.22f, -1.42f), new Vector3(0f, 0.02f, -0.20f), 52f), // ScorecardFocus
-                (new Vector3(0f, 0.92f, -0.75f), new Vector3(0f, 0.40f, 0.85f), 50f),  // OmaFocus
-            });
+            PlaceCamera(camera);
 
-            return new Refs { Dice = dice, CameraDirector = director, Scorecard = scorecard, Oma = oma };
+            return new Refs { Dice = dice, Scorecard = scorecard, Oma = oma };
         }
 
         /// <summary>Set dressing per the concept mockup: black dice cup (right), game box
@@ -106,13 +90,17 @@ namespace Yahtzee.Presentation
             box.GetComponent<Renderer>().material = Mat(new Color(0.55f, 0.14f, 0.12f));
             RemoveCollider(box); // outside the fence, decoration
 
+            // Oma's mug carries a "?" and IS the Ask Oma button — asking her advice should mean
+            // reaching across the table, not pressing a widget. Keeps its collider.
             var mug = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             mug.name = "OmaMug";
             mug.transform.SetParent(root, false);
-            mug.transform.localPosition = new Vector3(-0.30f, TableY + 0.055f, 0.62f);
-            mug.transform.localScale = new Vector3(0.10f, 0.055f, 0.10f);
-            mug.GetComponent<Renderer>().material = Mat(new Color(0.92f, 0.90f, 0.85f));
-            RemoveCollider(mug);
+            mug.transform.localPosition = new Vector3(-0.34f, TableY + 0.075f, 0.60f);
+            mug.transform.localScale = new Vector3(0.15f, 0.075f, 0.15f);
+            mug.GetComponent<Renderer>().material = Mat(new Color(0.94f, 0.92f, 0.87f));
+            if (controller != null)
+                mug.AddComponent<TappableProp>().Init(controller.OnAskOmaTapped);
+            AddMugQuestionMark(root, mug.transform.localPosition);
 
             // Oma's card KEEPS its collider — tapping it is how you peek at her scores, so it is
             // the one prop that must stay hittable. Scaled up a little from a true card so it is
@@ -120,16 +108,47 @@ namespace Yahtzee.Presentation
             var omaCard = GameObject.CreatePrimitive(PrimitiveType.Cube);
             omaCard.name = "OmaScorecardProp";
             omaCard.transform.SetParent(root, false);
-            omaCard.transform.localPosition = new Vector3(0.02f, TableY + 0.006f, 0.58f);
+            omaCard.transform.localPosition = new Vector3(0.02f, TableY + 0.006f, 0.66f);
             omaCard.transform.localRotation = Quaternion.Euler(0f, -6f, 0f);
             omaCard.transform.localScale = new Vector3(0.26f, 0.012f, 0.34f);
             omaCard.GetComponent<Renderer>().material = Mat(new Color(0.93f, 0.89f, 0.78f));
             if (controller != null)
                 omaCard.AddComponent<TappableProp>().Init(controller.OnPeekTapped);
 
-            AddPencil(root, "OmaPencil", new Vector3(0.24f, TableY + 0.008f, 0.56f), 15f);
+            AddPencil(root, "OmaPencil", new Vector3(0.26f, TableY + 0.008f, 0.64f), 15f);
             // Your own pencil, resting beside your card on your side of the table.
             AddPencil(root, "PlayerPencil", new Vector3(0.31f, TableY + 0.008f, -0.46f), -22f);
+        }
+
+        /// <summary>The "?" on the mug, on a world-space canvas facing the player. No rotation:
+        /// a canvas is read from the side its forward points AWAY from, and the player sits at -Z.</summary>
+        private static void AddMugQuestionMark(Transform root, Vector3 mugPosition)
+        {
+            var canvasGo = new GameObject("MugQuestionMark", typeof(Canvas));
+            canvasGo.transform.SetParent(root, false);
+            canvasGo.GetComponent<Canvas>().renderMode = RenderMode.WorldSpace;
+
+            var rect = (RectTransform)canvasGo.transform;
+            rect.sizeDelta = new Vector2(200f, 200f);
+            rect.localScale = Vector3.one * (0.11f / 200f);
+            rect.localPosition = mugPosition + new Vector3(0f, 0.005f, -0.076f);
+
+            var label = UiBuilder.Text(rect, "Text", "?", 150f, new Color(0.42f, 0.30f, 0.55f),
+                TMPro.TextAlignmentOptions.Center, Vector2.zero, Vector2.one);
+            label.fontStyle = TMPro.FontStyles.Bold;
+        }
+
+        /// <summary>Single fixed camera. The per-phase framings and their blends are gone (owner
+        /// call): the moves fought the transitions, and one seated pose that holds Oma, the dice
+        /// and the whole card at once is what the diegetic layout wanted anyway.</summary>
+        private static void PlaceCamera(Camera camera)
+        {
+            if (camera == null)
+                return;
+            var position = new Vector3(0f, 1.45f, -1.60f);
+            camera.transform.SetPositionAndRotation(
+                position, Quaternion.LookRotation(new Vector3(0f, -0.02f, 0.25f) - position, Vector3.up));
+            camera.fieldOfView = 58f;
         }
 
         private static void AddPencil(Transform root, string name, Vector3 position, float yaw)

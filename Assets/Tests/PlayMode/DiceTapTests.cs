@@ -30,12 +30,11 @@ namespace Yahtzee.Tests
         }
 
         [UnityTest]
-        public IEnumerator TappingADie_PicksThatDie_FromEveryFraming()
+        public IEnumerator TappingADie_PicksThatDie()
         {
             yield return LoadGameScene();
             var camera = Camera.main;
             var controller = Object.FindAnyObjectByType<GameController>();
-            var director = Object.FindAnyObjectByType<CameraDirector>();
             var view = Object.FindAnyObjectByType<DiceView3D>();
 
             controller.OnRollTapped();
@@ -44,16 +43,8 @@ namespace Yahtzee.Tests
 
             ReportWhatBlocksTheRay(camera, view);
 
-            foreach (var framing in new[]
-                     {
-                         CameraDirector.Framing.Default,
-                         CameraDirector.Framing.DiceFocus,
-                         CameraDirector.Framing.ScorecardFocus,
-                     })
             {
-                director.Set(framing, instant: true);
-                yield return null;
-
+                const string framing = "fixed camera";
                 foreach (var die in view.Dice)
                 {
                     Assert.IsTrue(die.gameObject.activeSelf, "all five dice should be on the table after a roll");

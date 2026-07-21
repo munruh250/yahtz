@@ -19,6 +19,18 @@ namespace Yahtzee.Presentation
         public static readonly Color DiePip = Hex("33261A");
         public static readonly Color KeptOutline = Hex("E4B54A");
 
+        // Top bar / menu chrome.
+        public static readonly Color BarDeep = Hex("2A1D14");
+        public static readonly Color BarLight = Hex("4A3728");
+
+        // Paper scorecard (design reference: the real Yahtzee pad — white stock, black ink,
+        // grey section bands).
+        public static readonly Color Paper = Hex("F7F5EE");
+        public static readonly Color PaperShade = Hex("DAD6CA");
+        public static readonly Color PaperRule = Hex("9A948A");
+        public static readonly Color PaperBand = Hex("BFBAAE");
+        public static readonly Color InkDark = Hex("1E1A15");
+
         private static Color Hex(string rgb)
         {
             ColorUtility.TryParseHtmlString("#" + rgb, out var color);

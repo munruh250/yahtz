@@ -59,7 +59,7 @@ namespace Yahtzee.Presentation
 
             AddBackingBoard(parent, rect);
 
-            var paper = UiBuilder.Image(rect, "Paper", Vector2.zero, Vector2.one, UiPalette.Panel).rectTransform;
+            var paper = UiBuilder.Image(rect, "Paper", Vector2.zero, Vector2.one, UiPalette.Paper).rectTransform;
             return BuildInto(paper, controller);
         }
 
@@ -84,55 +84,103 @@ namespace Yahtzee.Presentation
 
         /// <summary>Fills <paramref name="outer"/> with the 13 boxes, the owner title and the
         /// upper-bonus progress line, and returns the wired view.</summary>
+        /// <summary>Row heights in "units": a section band is shorter than a scoring row.</summary>
+        private const float BandUnits = 0.55f;
+        private const float TotalUnits = BandUnits + 7f; // band + 6 upper + bonus == band + 7 lower
+
+        /// <summary>Laid out like the real pad: white stock, black ink, grey section bands, ruled
+        /// rows, and the fixed scores printed beside the boxes that have them. Two columns rather
+        /// than the pad's one — portrait has no room for thirteen stacked rows — and no repeat
+        /// game columns, since this card only ever tracks one game.</summary>
         public static ScorecardView BuildInto(RectTransform outer, GameController controller)
         {
             var view = outer.gameObject.AddComponent<ScorecardView>();
-            var title = UiBuilder.Text(outer, "Owner", "YOUR CARD", 28f, UiPalette.CreamDim, TextAlignmentOptions.Center,
+            var title = UiBuilder.Text(outer, "Owner", "YOUR CARD", 26f, UiPalette.InkDark, TextAlignmentOptions.Center,
                 new Vector2(0f, 0.945f), new Vector2(1f, 1f));
+            title.fontStyle = FontStyles.Bold;
             var panel = UiBuilder.Rect(outer, "Grid", Vector2.zero, new Vector2(1f, 0.945f));
             var cells = new Dictionary<Category, ScoreCellView>();
 
-            // Left column: upper section + bonus progress row. Right column: lower section.
             var left = new[] { Category.Aces, Category.Twos, Category.Threes, Category.Fours, Category.Fives, Category.Sixes };
             var right = new[]
             {
                 Category.ThreeOfAKind, Category.FourOfAKind, Category.FullHouse, Category.SmallStraight,
                 Category.LargeStraight, Category.Yahtzee, Category.Chance,
             };
-            const float rows = 7f;
-            for (int r = 0; r < left.Length; r++)
-                cells[left[r]] = BuildCell(panel, left[r], controller,
-                    new Vector2(0.015f, 1f - (r + 1) / rows), new Vector2(0.495f, 1f - r / rows));
-            for (int r = 0; r < right.Length; r++)
-                cells[right[r]] = BuildCell(panel, right[r], controller,
-                    new Vector2(0.505f, 1f - (r + 1) / rows), new Vector2(0.985f, 1f - r / rows));
 
-            // Bonus progress row fills the left column's last slot.
-            var bonusRow = UiBuilder.Image(panel, "BonusRow", new Vector2(0.015f, 1f - 7f / rows),
-                new Vector2(0.495f, 1f - 6f / rows), UiPalette.CreamDim).rectTransform;
-            UiBuilder.Pad(bonusRow, 4f);
-            // Progress rendered by anchoring the fill's right edge (no sprite needed).
-            var fill = UiBuilder.Image(bonusRow, "Fill", Vector2.zero, new Vector2(0f, 1f), UiPalette.GoldDark);
-            var bonusLabel = UiBuilder.Text(bonusRow, "Label", "", 30f, UiPalette.Ink, TextAlignmentOptions.Center,
+            AddSectionBand(panel, "UPPER SECTION", 0.012f, 0.494f);
+            AddSectionBand(panel, "LOWER SECTION", 0.506f, 0.988f);
+
+            for (int r = 0; r < left.Length; r++)
+                cells[left[r]] = BuildCell(panel, left[r], controller, 0.012f, 0.494f, r, Hint(left[r]));
+            for (int r = 0; r < right.Length; r++)
+                cells[right[r]] = BuildCell(panel, right[r], controller, 0.506f, 0.988f, r, Hint(right[r]));
+
+            // Bonus row closes the upper column, exactly as the pad does.
+            var bonusRow = UiBuilder.Image(panel, "BonusRow",
+                new Vector2(0.012f, RowBottom(6)), new Vector2(0.494f, RowTop(6)), UiPalette.PaperBand).rectTransform;
+            var fill = UiBuilder.Image(bonusRow, "Fill", Vector2.zero, new Vector2(0f, 1f), UiPalette.Gold);
+            var bonusLabel = UiBuilder.Text(bonusRow, "Label", "", 27f, UiPalette.InkDark, TextAlignmentOptions.Center,
                 Vector2.zero, Vector2.one);
+            bonusLabel.fontStyle = FontStyles.Bold;
 
             view.Init(cells, bonusLabel, fill, title);
             return view;
         }
 
-        private static ScoreCellView BuildCell(RectTransform parent, Category category, GameController controller,
-            Vector2 aMin, Vector2 aMax)
+        /// <summary>What the pad prints next to a box: the face for the upper section, the fixed
+        /// score for the boxes that have one.</summary>
+        private static string Hint(Category category) => category switch
         {
-            var bg = UiBuilder.Image(parent, UiBuilder.DisplayName(category), aMin, aMax, UiPalette.Cream);
-            UiBuilder.Pad(bg.rectTransform, 4f);
+            Category.Aces => "=1",
+            Category.Twos => "=2",
+            Category.Threes => "=3",
+            Category.Fours => "=4",
+            Category.Fives => "=5",
+            Category.Sixes => "=6",
+            Category.FullHouse => "25",
+            Category.SmallStraight => "30",
+            Category.LargeStraight => "40",
+            Category.Yahtzee => "50",
+            _ => "",
+        };
+
+        private static float RowTop(int row) => 1f - (BandUnits + row) / TotalUnits;
+        private static float RowBottom(int row) => 1f - (BandUnits + row + 1f) / TotalUnits;
+
+        private static void AddSectionBand(RectTransform parent, string label, float xMin, float xMax)
+        {
+            var band = UiBuilder.Image(parent, label, new Vector2(xMin, 1f - BandUnits / TotalUnits),
+                new Vector2(xMax, 1f), UiPalette.PaperBand);
+            band.raycastTarget = false;
+            UiBuilder.Text(band.rectTransform, "Label", label, 22f, UiPalette.InkDark, TextAlignmentOptions.Center,
+                Vector2.zero, Vector2.one).fontStyle = FontStyles.Bold;
+        }
+
+        private static ScoreCellView BuildCell(RectTransform parent, Category category, GameController controller,
+            float xMin, float xMax, int row, string hint)
+        {
+            var bg = UiBuilder.Image(parent, UiBuilder.DisplayName(category),
+                new Vector2(xMin, RowBottom(row)), new Vector2(xMax, RowTop(row)), UiPalette.Paper);
             var button = bg.gameObject.AddComponent<Button>();
             button.targetGraphic = bg;
-            var name = UiBuilder.Text(bg.rectTransform, "Name", UiBuilder.DisplayName(category), 30f, UiPalette.Ink,
-                TextAlignmentOptions.MidlineLeft, new Vector2(0f, 0f), new Vector2(0.68f, 1f));
-            name.rectTransform.offsetMin = new Vector2(16f, 0f);
-            var value = UiBuilder.Text(bg.rectTransform, "Value", "", 36f, UiPalette.InkGhost,
-                TextAlignmentOptions.MidlineRight, new Vector2(0.68f, 0f), new Vector2(1f, 1f));
-            value.rectTransform.offsetMax = new Vector2(-16f, 0f);
+
+            // Hairline rule under each row instead of gaps between floating tiles.
+            var rule = UiBuilder.Image(bg.rectTransform, "Rule", Vector2.zero, new Vector2(1f, 0f), UiPalette.PaperRule);
+            rule.rectTransform.offsetMax = new Vector2(0f, 2f);
+            rule.raycastTarget = false;
+
+            var name = UiBuilder.Text(bg.rectTransform, "Name", UiBuilder.DisplayName(category), 28f, UiPalette.InkDark,
+                TextAlignmentOptions.MidlineLeft, new Vector2(0f, 0f), new Vector2(0.60f, 1f));
+            name.rectTransform.offsetMin = new Vector2(14f, 0f);
+
+            if (hint.Length > 0)
+                UiBuilder.Text(bg.rectTransform, "Hint", hint, 21f, UiPalette.PaperRule,
+                    TextAlignmentOptions.Center, new Vector2(0.60f, 0f), new Vector2(0.74f, 1f));
+
+            var value = UiBuilder.Text(bg.rectTransform, "Value", "", 34f, UiPalette.InkGhost,
+                TextAlignmentOptions.MidlineRight, new Vector2(0.74f, 0f), new Vector2(1f, 1f));
+            value.rectTransform.offsetMax = new Vector2(-14f, 0f);
 
             var cell = bg.gameObject.AddComponent<ScoreCellView>();
             cell.Init(bg, name, value, button, () => controller.OnCellTapped(category));

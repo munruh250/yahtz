@@ -77,12 +77,11 @@ namespace Yahtzee.Tests
         /// <summary>Her card has to be reachable by an actual tap — the invisible fence sits
         /// between the camera and the table, and that is exactly what silently broke the dice.</summary>
         [UnityTest]
-        public IEnumerator OmasCard_IsPickableFromTheDefaultFraming()
+        public IEnumerator OmasCard_IsPickable()
         {
             yield return LoadGameScene();
             var camera = Camera.main;
             camera.aspect = 1080f / 2340f;
-            Object.FindAnyObjectByType<CameraDirector>().Set(CameraDirector.Framing.Default, instant: true);
             yield return null;
 
             var prop = FindOmaCardProp();

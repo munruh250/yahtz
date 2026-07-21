@@ -17,13 +17,16 @@ namespace Yahtzee.Presentation
         private GameObject _gameOverPanel;
         private TextMeshProUGUI _gameOverText;
         private GameObject _skipOverlay;
-        private Button _askButton;
+        private Image[] _rollPips;
+        private GameObject _menuPanel;
 
-        public void Init(Button rollButton, TextMeshProUGUI rollLabel, TextMeshProUGUI status,
+        public void Init(Button rollButton, TextMeshProUGUI rollLabel, Image[] rollPips, TextMeshProUGUI status,
             TextMeshProUGUI header, GameObject gameOverPanel, TextMeshProUGUI gameOverText,
-            GameObject skipOverlay, Button askButton)
+            GameObject skipOverlay, Button menuButton, GameObject menuPanel)
         {
-            _askButton = askButton;
+            _rollPips = rollPips;
+            _menuPanel = menuPanel;
+            menuButton.onClick.AddListener(ToggleMenu);
             _rollButton = rollButton;
             _rollLabel = rollLabel;
             _status = status;
@@ -42,12 +45,16 @@ namespace Yahtzee.Presentation
         public void SetRoll(bool enabled, int rollsRemaining)
         {
             _rollButton.interactable = enabled;
-            // Middle-dot pips: filled = rolls left this turn.
-            _rollLabel.text = rollsRemaining > 0 ? $"Roll  {new string('·', rollsRemaining)}" : "Roll";
+            _rollLabel.text = "ROLL";
+            // Filled squares = rolls left this turn.
+            for (int i = 0; i < _rollPips.Length; i++)
+                _rollPips[i].color = i < rollsRemaining ? UiPalette.Ink : UiPalette.GoldDark;
         }
 
-        /// <summary>Only offer a hint when there are dice on the table to advise about.</summary>
-        public void SetAskOma(bool enabled) => _askButton.interactable = enabled;
+        /// <summary>The hamburger holds everything that is not part of playing a turn.</summary>
+        public void ToggleMenu() => _menuPanel.SetActive(!_menuPanel.activeSelf);
+
+        public void CloseMenu() => _menuPanel.SetActive(false);
 
         public void SetStatus(string text) => _status.text = text;
 

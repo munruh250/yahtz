@@ -132,13 +132,6 @@ namespace Yahtzee.Presentation
         private void Update()
         {
             FireSettledIfDone();
-
-            if (_interactable && Input.GetMouseButtonDown(0) && !IsPointerOverUi())
-            {
-                var die = DieAtScreenPoint(Input.mousePosition);
-                if (die != null)
-                    _controller.OnDieTapped(die.Index);
-            }
         }
 
         /// <summary>The die under a screen point, or null if the tap missed one.
@@ -252,18 +245,6 @@ namespace Yahtzee.Presentation
         /// <summary>A die on the table from the throw — kept dice sit in their own row and are
         /// placed exactly, so they neither move nor collide.</summary>
         private bool IsLoose(int index) => _dice[index].gameObject.activeSelf && !_placedKept[index];
-
-        /// <summary>Don't steal a tap that landed on the scorecard or the action bar. The no-arg
-        /// overload only tracks the mouse pointer, so on a touch device it always reports false
-        /// and taps would fall through to the dice — hence the explicit finger id.</summary>
-        private static bool IsPointerOverUi()
-        {
-            if (EventSystem.current == null)
-                return false;
-            return Input.touchCount > 0
-                ? EventSystem.current.IsPointerOverGameObject(Input.GetTouch(0).fingerId)
-                : EventSystem.current.IsPointerOverGameObject();
-        }
 
         private float Rnd(float min, float max) => (float)(_throwRng.NextDouble() * (max - min) + min);
 

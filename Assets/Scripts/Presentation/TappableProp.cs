@@ -16,20 +16,24 @@ namespace Yahtzee.Presentation
         public void Tap() => _onTapped?.Invoke();
     }
 
-    /// <summary>Routes taps that land on the table to whichever <see cref="TappableProp"/> was
-    /// hit. Separate from the dice picking in <see cref="DiceView3D"/> because props stay
-    /// tappable when the dice are not — you can peek at Oma's card before rolling, or after your
-    /// rolls are spent.</summary>
+    /// <summary>The single router for taps that land on the table — dice and props both.
+    ///
+    /// It has to be one router, not two: the dice and Oma's card overlap on screen, so when
+    /// each had its own raycast a tap through a die into her card behind it fired *both*,
+    /// keeping a die and flipping to her scorecard at once. Now the nearest hit wins and a tap
+    /// does exactly one thing.</summary>
     public sealed class WorldTapInput : MonoBehaviour
     {
         private const float PickDistance = 8f;
 
         private Camera _camera;
+        private GameController _controller;
         private Func<bool> _enabled;
 
-        public void Init(Camera camera, Func<bool> enabled)
+        public void Init(Camera camera, GameController controller, Func<bool> enabled)
         {
             _camera = camera;
+            _controller = controller;
             _enabled = enabled;
         }
 
@@ -39,10 +43,37 @@ namespace Yahtzee.Presentation
                 return;
             if (IsPointerOverUi())
                 return;
+            DispatchTap(Input.mousePosition);
+        }
 
-            var prop = PropAtScreenPoint(Input.mousePosition);
-            if (prop != null)
-                prop.Tap();
+        /// <summary>Whatever is nearest under the point gets the tap: a die is kept/released, a
+        /// prop is activated. Public so tests can drive the real pick path.</summary>
+        public void DispatchTap(Vector3 screenPoint)
+        {
+            var hits = Physics.RaycastAll(_camera.ScreenPointToRay(screenPoint), PickDistance);
+            float nearest = float.MaxValue;
+            Die3D die = null;
+            TappableProp prop = null;
+
+            foreach (var hit in hits)
+            {
+                if (hit.distance >= nearest)
+                    continue;
+                // Every hit is considered, not just the first: the invisible fence stands between
+                // the camera and the table, so a first-hit raycast just reports a wall.
+                var hitDie = hit.collider.GetComponent<Die3D>();
+                var hitProp = hit.collider.GetComponent<TappableProp>();
+                if (hitDie == null && hitProp == null)
+                    continue;
+                nearest = hit.distance;
+                die = hitDie;
+                prop = hitProp;
+            }
+
+            if (die != null)
+                _controller.OnDieTapped(die.Index);
+            else
+                prop?.Tap();
         }
 
         /// <summary>Nearest tappable prop under a screen point. Considers every hit along the ray
