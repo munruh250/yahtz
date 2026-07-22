@@ -1,9 +1,9 @@
 # Handoff — Yahtzee with Oma
 
 **Last updated:** 2026-07-21
-**Status:** M1–M3 complete, **M4 ~90%** (only the real art pass is left), **M5 dialogue done** — Oma talks. The game is fully playable end-to-end in the 3D kitchen scene vs. an auto-playing Oma, and the scorecard is now a physical object on the table.
+**Status:** M1–M3 complete, **M4 ~90%** (only the real art pass is left), **M5 dialogue done**, **M6 screens done** (Title/Home/Settings/Store/HowToPlay/Results + pause menu) and **Play build hardened**. The one thing between here and a store submission is the **real art pass** and the **Play Console/legal work** in [`LAUNCH.md`](LAUNCH.md).
 **Test baseline (must stay green):** EditMode **111**, PlayMode **24**. Run them with `Tools\run-tests.ps1` — no need to close the editor.
-**Next task:** the art pass (M4) and M6 polish. See [What's left](#whats-left).
+**Next task:** the art pass (M4/M5), then audio/haptics (M6), then work [`LAUNCH.md`](LAUNCH.md).
 
 ---
 
@@ -130,7 +130,7 @@ Results XML parses with `[xml]$r = Get-Content out.xml; $r."test-run"` → `tota
 - **`OmaView`** — idle rotation (idle/shift/talking, 5–12 s) + `PlayReaction(Clap|Disbelief)`.
 - **`ScorecardBuilder`** — the one grid builder for both layers, styled after the real Yahtzee pad: white stock, black ink, grey UPPER/LOWER section bands, hairline rules, and the printed hints (`=1`…`=6`, and 25/30/40/50 on the fixed boxes). No repeat game columns — this card only ever tracks one game. `BuildInto(rect, …)` fills any RectTransform with the 13 boxes + title + bonus row; `BuildWorld(…)` wraps that in a **world-space canvas** lying on the table, propped 24° at the player, on a backing board. Card geometry (size, tilt, z) is a block of named constants at the top of the file — tune there, then re-run the framing renders.
 - **`SpeechBubbleView`** — Oma's bubble: replace-don't-queue, auto-dismiss, and **nothing in it is a raycast target** so it can never eat a tap (design §5.2, asserted by `AskOmaTests`). The component sits on an always-active holder, not on the panel it hides, or its `Update` would never run. M5's `DialogueService` should drive this API unchanged.
-- **`ScreensView` / `ScreensBuilder`** — the front-end: Title ("Dice with Oma") → Home → Settings / Store. Placeholder shells for M6's real Title/Results/Pause, but settings and store *function*: difficulty and dice skins persist and take effect immediately. Full-screen and opaque, so nothing behind them is tappable. The hamburger opens Home.
+- **`ScreensView` / `ScreensBuilder` / `ResultsView`** — the front-end: Title ("Dice with Oma") → Home → Settings / Store / How to Play, plus the end-of-game **Results** screen (winner banner, Oma's closing line, a You/Oma comparison table for all 13 boxes + total, Play Again / Home). Full-screen and opaque, so nothing behind them is tappable — which is also how a paused game freezes. The **hamburger opens Home mid-game**, which carries the full pause menu (Resume/Restart/How to Play/Settings/Store + a corner Title). Settings and Store *function* (difficulty and dice skins persist, take effect live); the old HudView game-over panel is **gone** — Results replaced it.
 - **`UiPalette`** — the whole game's colour, **named by role, not hue** (`Accent`, `Chrome`, `Paper`, `Ink`), so a re-tint never leaves a field called `Gold` holding a blue. Cozy/cartoony direction: soft periwinkle and lilac against warm cream, ink a deep indigo. Nothing fully saturated, nothing pure black or white.
 - **`UiSprites`** — rounded-rect sprites generated at runtime and 9-sliced, so every panel, button and tile has soft corners at any size. `UiBuilder.Image` applies one by default; `UiBuilder.Fill` is the square-cornered escape hatch for full-bleed backdrops, hairline rules and progress fills. Hard rectangles were most of what made the old chrome read as a spreadsheet.
 - **`DiceSkins`** — cosmetic dice colours (Classic, Ruby). The engine decides values and physics is theatre, so a skin can never touch gameplay. `DiceView3D.ApplySkin` re-tints the two shared materials, so a change repaints all five dice at once.
@@ -211,16 +211,20 @@ Results XML parses with `[xml]$r = Get-Content out.xml; $r."test-run"` → `tota
 - Full v1 trigger/line set per design §2 (3+ variants each, German flavor phrases).
 - Real Oma model integration; expression tech (blend shapes vs. material/UV swap) still undecided — decide with the artist. `OmaView`'s API stays the same either way.
 
-### M6 — Polish & ship-ready (not started)
+### M6 — Polish & ship-ready (partly done)
 
-Title / Results / Pause screens (only a game-over panel exists) · audio (`AudioService` + library, mute in PlayerPrefs) · haptics · special-hand fanfares · camera-motion comfort pass · icon/splash · IL2CPP+ARM64 build check · manual test checklist.
+**Done:** Title / Home / Settings / Store / **How to Play** / **Results** screens (`ScreensView` / `ScreensBuilder` / `ResultsView`); the hamburger→Home doubles as the **pause overlay** (Resume/Restart/How to Play/Settings/Store/Title). IL2CPP+ARM64 and the rest of the Play build config (`SceneBootstrapper.ConfigureForPlay`; release `.aab` build proven). "Yahtzee" → "Five of a Kind" in the UI.
+
+**Still to do:** audio (`AudioService` + library, mute in PlayerPrefs) · haptics (keep/score/five-of-a-kind) · special-hand fanfares · **real app icon + splash** (needs art) · manual test checklist. Camera-comfort pass is moot — the camera is a single fixed pose now.
+
+**Google Play submission** — the console/legal/art work lives in [`LAUNCH.md`](LAUNCH.md). Headline gotcha: a **new personal dev account must run a 14-day / 20-tester closed test before production**, so "submit" is ~2 weeks out, not same-day. And **run `Yahtzee > Setup Project` once against the real project** so the target-SDK/product-name settings land in `ProjectSettings.asset` (they are enforced in code but the editor was holding the project during dev).
 
 ### Loose ends
 
 - **Replacing the typeface:** drop a `.ttf`/`.otf` into `Assets/Fonts/` and run **Yahtzee > Build Font Asset**. The current face is `DearGrandma.otf`, built to `Assets/Resources/Fonts/GameFont.asset`, which `UiBuilder` applies to every text in the game. Note it is *wider* than a plain sans — swapping faces can overflow the scorecard's name column into the printed hints, which is what the tight column splits in `ScorecardBuilder.BuildCell` are for. Check the screen renders after any change.
 
 - Strip unused template modules (terrain, vehicles, XR) — cleanup, not urgent. **Adaptive Performance is already gone**: it was never in `manifest.json` directly but came via `com.unity.feature.mobile`, which is why removing it in Package Manager never stuck — the feature set re-added it on every resolve. Removing the feature set took Adaptive Performance, mobile-notifications and android-logcat with it.
-- Final game name / trademark review — before store submission.
+- **Trademark: resolved in-app, pending in the listing.** The UI says "Five of a Kind", not "Yahtzee" (display strings only — `Category.Yahtzee` and all internal names stay). The launcher label is "Dice with Oma". The **package id is still `com.DefaultCompany.yahtzee`** — owner is leaving it for now, but it is permanent once published and still holds the trademark word ([`LAUNCH.md`](LAUNCH.md) §6). Listing text must avoid "Yahtzee" too.
 
 ---
 

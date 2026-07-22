@@ -79,6 +79,13 @@ namespace Yahtzee.EditorTools
         /// console/legal/art side is tracked in Docs/LAUNCH.md.</summary>
         private static void ConfigureForPlay()
         {
+            // The launcher label. It was "yahtzee" — lowercase, and the trademark word — which is
+            // exactly wrong on a phone's home screen. Set it to the real name. This moves
+            // Application.persistentDataPath (…/DefaultCompany/Dice with Oma/), orphaning any test
+            // save, which is harmless pre-launch. The package id (applicationIdentifier) is
+            // separate and the owner is leaving it for now (LAUNCH.md).
+            PlayerSettings.productName = "Dice with Oma";
+
             // Target the current Play API floor. 35 is installed and Unity 2022.3-supported (36 is
             // installed but not by this LTS). Bump to whatever Play enforces at submission — it is
             // a one-line change and LAUNCH.md flags it.
