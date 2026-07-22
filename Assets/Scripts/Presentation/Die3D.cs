@@ -4,9 +4,10 @@ namespace Yahtzee.Presentation
 {
     /// <summary>One physical die. The engine decides the value BEFORE the throw; physics is
     /// theater (TECH_PLAN §5.4). The die tumbles freely, and once it loses energy the last
-    /// tumble is blended (~0.25 s slerp along the shortest arc) so the resting face matches
-    /// the engine value — imperceptible because it happens while the die is still moving.
-    /// A watchdog hard-snaps anything still unsettled (cocked, off-oval) after 2.5 s.</summary>
+    /// tumble is blended (~0.25 s) onto the engine value — landing by *continuing* the roll
+    /// forward (<see cref="ForwardTargetRotation"/>) rather than snapping the short way, so it
+    /// never flips backward as it settles. A watchdog hard-snaps anything still unsettled
+    /// (cocked, off-oval) after 2.5 s.</summary>
     [RequireComponent(typeof(Rigidbody), typeof(BoxCollider))]
     public sealed class Die3D : MonoBehaviour
     {
@@ -40,6 +41,8 @@ namespace Yahtzee.Presentation
         private float _rollStartTime;
         private float _correctT;
         private Quaternion _correctFrom, _correctTo;
+        private Vector3 _correctAxis;
+        private float _correctDegrees;
         private float _restY;
         private float _slowSeconds;
 
@@ -150,7 +153,12 @@ namespace Yahtzee.Presentation
                     }
                     else
                     {
-                        transform.rotation = Quaternion.Slerp(_correctFrom, _correctTo, _correctT);
+                        // Drive the rotation FORWARD along the tumble axis rather than slerping the
+                        // short way — a forward roll past 180° would wrap and slerp backward. The
+                        // exact target (with its tiny yaw snap) eases in as the roll finishes.
+                        float e = Mathf.SmoothStep(0f, 1f, _correctT);
+                        Quaternion rolled = Quaternion.AngleAxis(_correctDegrees * e, _correctAxis) * _correctFrom;
+                        transform.rotation = Quaternion.Slerp(rolled, _correctTo, e);
                     }
                     break;
             }
@@ -158,20 +166,73 @@ namespace Yahtzee.Presentation
 
         private void BeginCorrection()
         {
+            // Capture the spin BEFORE going kinematic (which zeroes it) — the correction follows
+            // its direction so the die keeps tumbling the way it was, instead of flipping back.
+            Vector3 spin = _rb.angularVelocity;
             _rb.isKinematic = true; // hand the last tumble to the blend
             _correctFrom = transform.rotation;
-            _correctTo = ClosestTargetRotation();
+            ComputeSettle(transform.rotation, _targetValue, spin, out _correctTo, out _correctAxis, out _correctDegrees);
             _correctT = 0f;
             _phase = Phase.Correcting;
         }
 
-        /// <summary>The target-face-up rotation nearest the die's current orientation: rotate
-        /// the target face's current world direction up along the shortest arc, preserving
-        /// yaw — so the correction reads as the natural end of the tumble.</summary>
-        private Quaternion ClosestTargetRotation()
+        /// <summary>Instant snap to the engine face (skip, watchdog) — the short way, since an
+        /// instant jump has no direction to read.</summary>
+        private Quaternion ClosestTargetRotation() => SnapUp(transform.rotation, _targetValue);
+
+        /// <summary>How to land the engine value by *continuing the roll forward*, not flipping the
+        /// short way. Returns the exact resting rotation plus the forward roll (<paramref
+        /// name="axis"/>, <paramref name="degrees"/>) to get there, so the correction can drive the
+        /// die along that arc rather than slerping backward. Pure and static so the
+        /// "never flips backward" property is unit-testable without a physics scene.
+        ///
+        /// Sweeps forward about the spin axis (from 0, so an already-landed die barely moves) for
+        /// the first orientation with the target face up — the natural end of the tumble. Falls
+        /// back to the shortest snap only when the spin is negligible or near-vertical, where there
+        /// is no forward face-up to roll into and no tumble direction to preserve anyway.</summary>
+        public static void ComputeSettle(Quaternion current, int targetValue, Vector3 spinWorld,
+            out Quaternion target, out Vector3 axis, out float degrees)
         {
-            Vector3 targetFaceWorld = transform.rotation * FaceDirs[_targetValue];
-            return Quaternion.FromToRotation(targetFaceWorld, Vector3.up) * transform.rotation;
+            if (spinWorld.sqrMagnitude >= 0.04f) // ~0.2 rad/s: worth continuing the tumble
+            {
+                // Tip the target face up by rolling about a HORIZONTAL axis perpendicular to that
+                // face's normal — the axis a real die pivots on as it tips onto a face. Being ⊥ the
+                // normal *and* ⊥ up guarantees the face sweeps through straight-up (so the engine
+                // value is always reachable this way), and being horizontal means the sweep
+                // actually passes through up rather than tracing a tilted cone that misses it.
+                Vector3 targetNormal = current * FaceDirs[targetValue];
+                Vector3 pivot = Vector3.Cross(targetNormal, Vector3.up); // ⊥ normal, ⊥ up
+                if (pivot.sqrMagnitude < 0.02f)                          // face already vertical…
+                    pivot = new Vector3(spinWorld.x, 0f, spinWorld.z);   // …tip about the spin's ground track
+                if (pivot.sqrMagnitude < 0.02f)                          // spin is vertical too
+                    pivot = Vector3.forward;                             // any horizontal axis will do
+
+                axis = pivot.normalized;
+                // Sign it to the tumble so the roll goes the way the die is already turning.
+                if (Vector3.Dot(axis, spinWorld) < 0f)
+                    axis = -axis;
+
+                for (float deg = 0f; deg <= 358f; deg += 2f)
+                {
+                    Quaternion rolled = Quaternion.AngleAxis(deg, axis) * current;
+                    // Target face within ~11° of straight up: the resting point of this tip.
+                    if (Vector3.Dot(rolled * FaceDirs[targetValue], Vector3.up) > 0.98f)
+                    {
+                        target = SnapUp(rolled, targetValue);
+                        degrees = deg;
+                        return;
+                    }
+                }
+            }
+
+            // Negligible spin: die is essentially stopped, so direction doesn't read — shortest snap.
+            target = SnapUp(current, targetValue);
+            (target * Quaternion.Inverse(current)).ToAngleAxis(out degrees, out axis);
         }
+
+        /// <summary>Rotate <paramref name="from"/> the short way so <paramref name="value"/>'s face
+        /// is exactly up, preserving yaw — removes the residual tilt left after a forward roll.</summary>
+        private static Quaternion SnapUp(Quaternion from, int value) =>
+            Quaternion.FromToRotation(from * FaceDirs[value], Vector3.up) * from;
     }
 }
