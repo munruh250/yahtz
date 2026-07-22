@@ -71,6 +71,28 @@ namespace Yahtzee.EditorTools
             // backend has to be set first or the architecture assignment is clamped back.
             PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+
+            ConfigureForPlay();
+        }
+
+        /// <summary>Google Play submission requirements that live in the build config. The
+        /// console/legal/art side is tracked in Docs/LAUNCH.md.</summary>
+        private static void ConfigureForPlay()
+        {
+            // Target the current Play API floor. 35 is installed and Unity 2022.3-supported (36 is
+            // installed but not by this LTS). Bump to whatever Play enforces at submission — it is
+            // a one-line change and LAUNCH.md flags it.
+            PlayerSettings.Android.targetSdkVersion = (AndroidSdkVersions)35;
+
+            // Fully offline (design §5.5: no network, no accounts, no analytics), so don't let
+            // Unity fold in the INTERNET / storage permissions. The Play Data-Safety form can then
+            // honestly declare that the app collects and requests nothing.
+            PlayerSettings.Android.forceInternetPermission = false;
+            PlayerSettings.Android.forceSDCardPermission = false;
+
+            // Play requires an App Bundle (.aab) for new apps; the smoke build still makes an APK
+            // for on-device testing. Both come off the same IL2CPP/ARM64 settings above.
+            EditorUserBuildSettings.buildAppBundle = true;
         }
     }
 }

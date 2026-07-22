@@ -36,6 +36,40 @@ namespace Yahtzee.EditorTools
         public static void BuildDesktopBatch() =>
             EditorApplication.Exit(RunBuild(BuildTarget.StandaloneWindows64) ? 0 : 1);
 
+        /// <summary>The store artifact: a release .aab. Non-development, so it strips fully and is
+        /// as small/fast as it ships. It is signed with the debug keystore unless a release
+        /// keystore is configured — Play needs the release one, which is the owner's step
+        /// (Docs/LAUNCH.md). This verifies the bundle builds; it is not itself uploadable.</summary>
+        [MenuItem("Yahtzee/Release Build (Android App Bundle)")]
+        public static void BuildReleaseAab() => RunReleaseAab();
+
+        public static void BuildReleaseAabBatch() => EditorApplication.Exit(RunReleaseAab() ? 0 : 1);
+
+        private static bool RunReleaseAab()
+        {
+            Directory.CreateDirectory(OutputDir);
+            bool wasBundle = EditorUserBuildSettings.buildAppBundle;
+            EditorUserBuildSettings.buildAppBundle = true; // .aab, not .apk
+            try
+            {
+                var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+                {
+                    scenes = new[] { "Assets/Scenes/Game.unity" },
+                    locationPathName = Path.Combine(OutputDir, "dice-with-oma.aab"),
+                    target = BuildTarget.Android,
+                    targetGroup = BuildTargetGroup.Android,
+                    options = BuildOptions.None, // release: full strip, no dev console
+                });
+                var summary = report.summary;
+                Debug.Log($"RELEASEBUILD result={summary.result} errors={summary.totalErrors} size={summary.totalSize} output={summary.outputPath}");
+                return summary.result == BuildResult.Succeeded;
+            }
+            finally
+            {
+                EditorUserBuildSettings.buildAppBundle = wasBundle;
+            }
+        }
+
         private static bool RunBuild(BuildTarget target)
         {
             Directory.CreateDirectory(OutputDir);
