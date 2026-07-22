@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using Yahtzee.Core;
 using Yahtzee.Services;
 
 namespace Yahtzee.Presentation
@@ -23,9 +24,11 @@ namespace Yahtzee.Presentation
                 { ScreensView.Screen.Home, BuildHome(root, view, controller, refreshers) },
                 { ScreensView.Screen.Settings, BuildSettings(root, view, controller, refreshers) },
                 { ScreensView.Screen.Store, BuildStore(root, view, controller, refreshers) },
+                { ScreensView.Screen.HowToPlay, BuildHowToPlay(root, view) },
+                { ScreensView.Screen.Results, BuildResults(root, view, controller, out var results) },
             };
 
-            view.Init(panels, () =>
+            view.Init(panels, results, () =>
             {
                 foreach (var refresh in refreshers)
                     refresh();
@@ -64,18 +67,131 @@ namespace Yahtzee.Presentation
             var backdrop = Backdrop(parent, "HomeScreen");
             var card = Card(backdrop, "DICE WITH OMA");
 
+            // Home doubles as the pause overlay when opened mid-game from the hamburger, so it
+            // carries the full design §5.1 set: resume, restart, rules, settings, store, and a
+            // corner "Title" to quit out.
             var resume = MenuButton(card, "Resume", 0, UiPalette.AccentSoft, () => view.Close());
             MenuButton(card, "New Game", 1, UiPalette.Accent, () =>
             {
                 view.Close();
                 controller.OnNewGameTapped();
             });
-            MenuButton(card, "Settings", 2, UiPalette.ChromeLight, () => view.Show(ScreensView.Screen.Settings));
-            MenuButton(card, "Store", 3, UiPalette.ChromeLight, () => view.Show(ScreensView.Screen.Store));
+            MenuButton(card, "How to Play", 2, UiPalette.ChromeLight, () => view.Show(ScreensView.Screen.HowToPlay));
+            MenuButton(card, "Settings", 3, UiPalette.ChromeLight, () => view.Show(ScreensView.Screen.Settings));
+            MenuButton(card, "Store", 4, UiPalette.ChromeLight, () => view.Show(ScreensView.Screen.Store));
+            CornerButton(card, "Title", () => view.Show(ScreensView.Screen.Title));
 
             // Nothing to resume before the first game starts.
             refreshers.Add(() => resume.gameObject.SetActive(controller.Engine != null));
             return backdrop.gameObject;
+        }
+
+        /// <summary>The static rules card (design §5.1). Enough to play, not a manual — the game
+        /// teaches the rest through the ghosted potentials and the Ask-Oma hint.</summary>
+        private static GameObject BuildHowToPlay(RectTransform parent, ScreensView view)
+        {
+            var backdrop = Backdrop(parent, "HowToPlayScreen");
+            var card = Card(backdrop, "HOW TO PLAY");
+
+            const string rules =
+                "Thirteen rounds. Each turn:\n\n" +
+                "•  Tap ROLL to throw all five dice.\n" +
+                "•  Tap any die to keep it, then roll again — up to three rolls.\n" +
+                "•  Tap a box on your card to score there, then tap it again to confirm.\n\n" +
+                "Each box is used once. Fill your upper section (Aces–Sixes) to 63 for a +35 bonus.\n\n" +
+                "Stuck? Tap Oma's mug to ask what she would do. Tap her card to peek at her score.\n\n" +
+                "Most points after thirteen rounds wins. Viel Glück, Schatz!";
+
+            var body = UiBuilder.Text(card, "Rules", rules, 30f, UiPalette.Ink, TextAlignmentOptions.TopLeft,
+                new Vector2(0.08f, 0.16f), new Vector2(0.92f, 0.80f));
+            body.enableWordWrapping = true;
+
+            MenuButton(card, "Back", 4, UiPalette.ChromeLight, () => view.Show(ScreensView.Screen.Home));
+            return backdrop.gameObject;
+        }
+
+        private static GameObject BuildResults(RectTransform parent, ScreensView view, GameController controller,
+            out ResultsView results)
+        {
+            var backdrop = Backdrop(parent, "ResultsScreen");
+            var card = UiBuilder.Image(backdrop, "Card", new Vector2(0.05f, 0.10f), new Vector2(0.95f, 0.83f),
+                UiPalette.Paper, cornerRadius: 34);
+            results = card.gameObject.AddComponent<ResultsView>();
+
+            // Outcome banner sits across the card's top edge, its text set per game.
+            var banner = UiBuilder.Image(backdrop, "Banner", new Vector2(0.14f, 0.80f), new Vector2(0.86f, 0.90f),
+                UiPalette.Accent, cornerRadius: 28);
+            var bannerText = UiBuilder.Text(banner.rectTransform, "Text", "", 56f, UiPalette.Cream,
+                TextAlignmentOptions.Center, Vector2.zero, Vector2.one);
+            bannerText.fontStyle = FontStyles.Bold;
+
+            var omaLine = UiBuilder.Text(card.rectTransform, "OmaLine", "", 27f, UiPalette.Ink,
+                TextAlignmentOptions.Center, new Vector2(0.06f, 0.845f), new Vector2(0.94f, 0.94f));
+            omaLine.enableWordWrapping = true;
+            omaLine.fontStyle = FontStyles.Italic;
+
+            // Column headers.
+            UiBuilder.Text(card.rectTransform, "YouHead", "You", 26f, UiPalette.Ink, TextAlignmentOptions.Center,
+                new Vector2(0.50f, 0.80f), new Vector2(0.72f, 0.845f)).fontStyle = FontStyles.Bold;
+            UiBuilder.Text(card.rectTransform, "OmaHead", "Oma", 26f, UiPalette.Ink, TextAlignmentOptions.Center,
+                new Vector2(0.74f, 0.80f), new Vector2(0.96f, 0.845f)).fontStyle = FontStyles.Bold;
+
+            var order = new[]
+            {
+                Category.Aces, Category.Twos, Category.Threes, Category.Fours, Category.Fives, Category.Sixes,
+                Category.ThreeOfAKind, Category.FourOfAKind, Category.FullHouse, Category.SmallStraight,
+                Category.LargeStraight, Category.Yahtzee, Category.Chance,
+            };
+            const float top = 0.79f, pitch = 0.036f;
+            for (int i = 0; i < order.Length; i++)
+                ComparisonRow(card.rectTransform, order[i], top - i * pitch, pitch, results);
+
+            // Total, bold, under a rule.
+            float totalTop = top - order.Length * pitch - 0.004f;
+            var totalRule = UiBuilder.Fill(card.rectTransform, "Rule", new Vector2(0.06f, totalTop),
+                new Vector2(0.96f, totalTop), UiPalette.PaperRule);
+            totalRule.rectTransform.offsetMax = new Vector2(0f, 2f);
+            UiBuilder.Text(card.rectTransform, "TotalLabel", "Total", 30f, UiPalette.Ink, TextAlignmentOptions.MidlineLeft,
+                new Vector2(0.08f, totalTop - pitch * 1.3f), new Vector2(0.50f, totalTop)).fontStyle = FontStyles.Bold;
+            var playerTotal = UiBuilder.Text(card.rectTransform, "PlayerTotal", "", 32f, UiPalette.Ink,
+                TextAlignmentOptions.Center, new Vector2(0.50f, totalTop - pitch * 1.3f), new Vector2(0.72f, totalTop));
+            playerTotal.fontStyle = FontStyles.Bold;
+            var omaTotal = UiBuilder.Text(card.rectTransform, "OmaTotal", "", 32f, UiPalette.Ink,
+                TextAlignmentOptions.Center, new Vector2(0.74f, totalTop - pitch * 1.3f), new Vector2(0.96f, totalTop));
+            omaTotal.fontStyle = FontStyles.Bold;
+
+            results.Init(bannerText, omaLine, playerTotal, omaTotal);
+
+            // Play Again / Home, side by side under the card.
+            var again = UiBuilder.Image(backdrop, "PlayAgain", new Vector2(0.08f, 0.025f), new Vector2(0.50f, 0.085f),
+                UiPalette.Accent, cornerRadius: 24);
+            again.gameObject.AddComponent<Button>().onClick.AddListener(() =>
+            {
+                view.Close();
+                controller.OnNewGameTapped();
+            });
+            UiBuilder.Text(again.rectTransform, "Label", "Play again", 32f, UiPalette.Ink,
+                TextAlignmentOptions.Center, Vector2.zero, Vector2.one).fontStyle = FontStyles.Bold;
+
+            var home = UiBuilder.Image(backdrop, "HomeBtn", new Vector2(0.52f, 0.025f), new Vector2(0.92f, 0.085f),
+                UiPalette.ChromeLight, cornerRadius: 24);
+            home.gameObject.AddComponent<Button>().onClick.AddListener(() => view.Show(ScreensView.Screen.Home));
+            UiBuilder.Text(home.rectTransform, "Label", "Home", 32f, UiPalette.Cream,
+                TextAlignmentOptions.Center, Vector2.zero, Vector2.one).fontStyle = FontStyles.Bold;
+
+            return backdrop.gameObject;
+        }
+
+        /// <summary>One category's You/Oma comparison line on the results card.</summary>
+        private static void ComparisonRow(RectTransform card, Category category, float top, float pitch, ResultsView results)
+        {
+            UiBuilder.Text(card, "N_" + category, UiBuilder.DisplayName(category), 22f, UiPalette.Ink,
+                TextAlignmentOptions.MidlineLeft, new Vector2(0.08f, top - pitch), new Vector2(0.50f, top));
+            var player = UiBuilder.Text(card, "P_" + category, "", 24f, UiPalette.Ink, TextAlignmentOptions.Center,
+                new Vector2(0.50f, top - pitch), new Vector2(0.72f, top));
+            var oma = UiBuilder.Text(card, "O_" + category, "", 24f, UiPalette.Ink, TextAlignmentOptions.Center,
+                new Vector2(0.74f, top - pitch), new Vector2(0.96f, top));
+            results.AddRow(category, player, oma);
         }
 
         private static GameObject BuildSettings(RectTransform parent, ScreensView view, GameController controller,
@@ -211,20 +327,35 @@ namespace Yahtzee.Presentation
                 TextAlignmentOptions.Center, Vector2.zero, Vector2.one).fontStyle = FontStyles.Bold;
         }
 
+        /// <summary>A stacked menu row. Spacing fits up to five rows in a card, so Home can carry
+        /// the full pause menu; index 3 is also where the Settings/Store "Back" lands, clear of
+        /// their content above it.</summary>
         private static Image MenuButton(RectTransform parent, string label, int index, Color colour,
             UnityEngine.Events.UnityAction onClick)
         {
-            float top = 0.70f - index * 0.145f;
-            var bg = UiBuilder.Image(parent, label, new Vector2(0.10f, top - 0.115f), new Vector2(0.90f, top),
+            float top = 0.75f - index * 0.12f;
+            var bg = UiBuilder.Image(parent, label, new Vector2(0.10f, top - 0.10f), new Vector2(0.90f, top),
                 colour, cornerRadius: 26);
             var button = bg.gameObject.AddComponent<Button>();
             button.targetGraphic = bg;
             button.onClick.AddListener(onClick);
-            var text = UiBuilder.Text(bg.rectTransform, "Label", label, 40f,
+            var text = UiBuilder.Text(bg.rectTransform, "Label", label, 38f,
                 colour == UiPalette.ChromeLight ? UiPalette.Cream : UiPalette.Ink,
                 TextAlignmentOptions.Center, Vector2.zero, Vector2.one);
             text.fontStyle = FontStyles.Bold;
             return bg;
+        }
+
+        /// <summary>Small corner button, e.g. Home's "Title" (quit to the title screen).</summary>
+        private static void CornerButton(RectTransform card, string label, UnityEngine.Events.UnityAction onClick)
+        {
+            var bg = UiBuilder.Image(card, "Corner", new Vector2(0.06f, 0.80f), new Vector2(0.30f, 0.85f),
+                UiPalette.PaperShade, cornerRadius: 16);
+            var button = bg.gameObject.AddComponent<Button>();
+            button.targetGraphic = bg;
+            button.onClick.AddListener(onClick);
+            UiBuilder.Text(bg.rectTransform, "Label", label, 26f, UiPalette.Ink,
+                TextAlignmentOptions.Center, Vector2.zero, Vector2.one).fontStyle = FontStyles.Bold;
         }
 
         private static Image Chip(RectTransform parent, string label, int index, int count, float top,

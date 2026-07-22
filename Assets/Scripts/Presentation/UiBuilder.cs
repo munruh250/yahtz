@@ -25,11 +25,15 @@ namespace Yahtzee.Presentation
 
         public static string DisplayName(Category category) => Names[(int)category];
 
+        // Player-facing box names. "Five of a Kind" rather than "Yahtzee": that word is Hasbro's
+        // trademark (TECH_PLAN §8), and the generic name removes the clearest store/legal hook.
+        // Only the display string changes — the Core enum stays Category.Yahtzee, so no rules or
+        // save code moves.
         private static readonly string[] Names =
         {
             "Aces", "Twos", "Threes", "Fours", "Fives", "Sixes",
             "3 of a Kind", "4 of a Kind", "Full House", "Sm Straight", "Lg Straight",
-            "Yahtzee", "Chance",
+            "Five of a Kind", "Chance",
         };
 
         /// <summary>Builds the screen-space UI. With <paramref name="worldDice"/> the canvas keeps
@@ -65,17 +69,15 @@ namespace Yahtzee.Presentation
             BuildRollBar(safe, controller, out var rollButton, out var rollLabel, out var rollPips);
             refs.SpeechBubble = BuildSpeechBubble(safe);
 
-            // Sibling order = raycast/draw order: skip overlay above the play surface,
-            // game-over scrim above everything.
+            // Skip overlay sits above the play surface; the front-end screens (built last) cover
+            // everything, including the end-of-game Results screen.
             var skipOverlay = BuildSkipOverlay(safe, controller);
             BuildMenuPanel(menuPanel, controller);
-            BuildGameOver(safe, controller, out var gameOverPanel, out var gameOverText);
 
             refs.Screens = ScreensBuilder.Build(safe, controller);
 
             refs.Hud = safe.gameObject.AddComponent<HudView>();
-            refs.Hud.Init(rollButton, rollLabel, rollPips, status, header, gameOverPanel, gameOverText,
-                skipOverlay, menuButton, menuPanel);
+            refs.Hud.Init(rollButton, rollLabel, rollPips, status, header, skipOverlay, menuButton, menuPanel);
             return refs;
         }
 
@@ -261,23 +263,6 @@ namespace Yahtzee.Presentation
 
             view.Init(panel.gameObject, text);
             return view;
-        }
-
-        private static void BuildGameOver(RectTransform parent, GameController controller, out GameObject panel, out TextMeshProUGUI text)
-        {
-            var scrim = Fill(parent, "GameOver", Vector2.zero, Vector2.one, new Color(0.16f, 0.14f, 0.26f, 0.82f));
-            panel = scrim.gameObject;
-            var box = Image(scrim.rectTransform, "Box", new Vector2(0.08f, 0.38f), new Vector2(0.92f, 0.62f), UiPalette.Cream).rectTransform;
-            text = Text(box, "Text", "", 60f, UiPalette.Ink, TextAlignmentOptions.Center,
-                new Vector2(0f, 0.35f), new Vector2(1f, 1f));
-            text.fontStyle = FontStyles.Bold;
-
-            var againBg = Image(box, "PlayAgain", new Vector2(0.22f, 0.06f), new Vector2(0.78f, 0.32f), UiPalette.Accent);
-            var againButton = againBg.gameObject.AddComponent<Button>();
-            againButton.targetGraphic = againBg;
-            againButton.onClick.AddListener(controller.OnNewGameTapped);
-            Text(againBg.rectTransform, "Label", "Play again", 42f, UiPalette.Ink, TextAlignmentOptions.Center,
-                Vector2.zero, Vector2.one).fontStyle = FontStyles.Bold;
         }
 
         // ---- Primitive helpers (shared with ScorecardBuilder) ----------------

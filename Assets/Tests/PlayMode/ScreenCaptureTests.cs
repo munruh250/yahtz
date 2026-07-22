@@ -75,17 +75,21 @@ namespace Yahtzee.Tests
             yield return null;
             Capture("screen-ingame");
 
-            // Game over is the one panel no other capture reaches, and it is styled from the
-            // same palette as everything else — so it is exactly where a rename goes unnoticed.
-            var hud = Object.FindAnyObjectByType<HudView>();
-            hud.ShowGameOver(new Yahtzee.Core.GameEnded
-            {
-                PlayerTotal = 214,
-                OmaTotal = 198,
-                Result = Yahtzee.Core.GameResult.PlayerWins,
-            });
+            // The Results screen (design §5.1) — populated from a real finished game so the
+            // comparison table is filled, not just an empty shell.
+            var state = controller.Engine.State;
+            state.PlayerCard.SetScore(Yahtzee.Core.Category.Aces, 3);
+            state.PlayerCard.SetScore(Yahtzee.Core.Category.Fives, 15);
+            state.OmaCard.SetScore(Yahtzee.Core.Category.Sixes, 18);
+            screens.ShowResults(state, Yahtzee.Core.GameResult.PlayerWins,
+                "You beat me! Ach, wunderbar. Come here, let me look at you.");
             yield return null;
-            Capture("screen-gameover");
+            Capture("screen-results");
+
+            // And the How to Play rules card.
+            screens.Show(ScreensView.Screen.HowToPlay);
+            yield return null;
+            Capture("screen-howtoplay");
 
             Assert.IsTrue(File.Exists(Path.Combine(OutDir, "screen-ingame.png")));
         }

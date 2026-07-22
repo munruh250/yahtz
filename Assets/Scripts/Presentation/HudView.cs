@@ -14,15 +14,12 @@ namespace Yahtzee.Presentation
         private TextMeshProUGUI _rollLabel;
         private TextMeshProUGUI _status;
         private TextMeshProUGUI _header;
-        private GameObject _gameOverPanel;
-        private TextMeshProUGUI _gameOverText;
         private GameObject _skipOverlay;
         private Image[] _rollPips;
         private GameObject _menuPanel;
 
         public void Init(Button rollButton, TextMeshProUGUI rollLabel, Image[] rollPips, TextMeshProUGUI status,
-            TextMeshProUGUI header, GameObject gameOverPanel, TextMeshProUGUI gameOverText,
-            GameObject skipOverlay, Button menuButton, GameObject menuPanel)
+            TextMeshProUGUI header, GameObject skipOverlay, Button menuButton, GameObject menuPanel)
         {
             _rollPips = rollPips;
             _menuPanel = menuPanel;
@@ -31,10 +28,7 @@ namespace Yahtzee.Presentation
             _rollLabel = rollLabel;
             _status = status;
             _header = header;
-            _gameOverPanel = gameOverPanel;
-            _gameOverText = gameOverText;
             _skipOverlay = skipOverlay;
-            _gameOverPanel.SetActive(false);
             _skipOverlay.SetActive(false);
         }
 
@@ -67,19 +61,5 @@ namespace Yahtzee.Presentation
             // camera cutout cannot clip it.
             _header.text = $"You  {state.PlayerCard.Total}      Oma  {state.OmaCard.Total}";
         }
-
-        public void ShowGameOver(GameEnded ended)
-        {
-            _gameOverPanel.SetActive(true);
-            string headline = ended.Result switch
-            {
-                GameResult.PlayerWins => "You win!",
-                GameResult.OmaWins => "Oma wins!",
-                _ => "It's a tie!",
-            };
-            _gameOverText.text = $"{headline}\nYou {ended.PlayerTotal}  -  Oma {ended.OmaTotal}";
-        }
-
-        public void HideGameOver() => _gameOverPanel.SetActive(false);
     }
 }

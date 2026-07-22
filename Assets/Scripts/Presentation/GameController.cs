@@ -124,7 +124,6 @@ namespace Yahtzee.Presentation
             _fastForward = false;
             _toast = null;
             InputLocked = false;
-            _hud.HideGameOver();
             _hud.CloseMenu();
             _speech.Hide(); // a hint about the previous game's dice would be nonsense
             RefreshAll();
@@ -309,7 +308,11 @@ namespace Yahtzee.Presentation
 
         private void OnGameEvent(GameEvent gameEvent)
         {
-            Say(_dialogue.React(gameEvent, Engine.State));
+            string line = _dialogue.React(gameEvent, Engine.State);
+            // At game end her closing line goes on the Results card, not into a bubble that the
+            // card would immediately cover.
+            if (gameEvent is not GameEnded)
+                Say(line);
             switch (gameEvent)
             {
                 case DiceRolled rolled:
@@ -320,7 +323,7 @@ namespace Yahtzee.Presentation
                     break;
                 case ScoreCommitted committed:
                     if (committed.YahtzeeBonusAwarded)
-                        _toast = "Yahtzee bonus +100! ";
+                        _toast = "Five of a Kind bonus +100! ";
                     ReactToScore(committed);
                     break;
                 case UpperBonusSecured bonus:
@@ -336,7 +339,7 @@ namespace Yahtzee.Presentation
                 case GameEnded ended:
                     SaveService.Save(Engine.State);
                     RefreshAll();
-                    _hud.ShowGameOver(ended);
+                    _screens.ShowResults(Engine.State, ended.Result, line);
                     break;
             }
         }

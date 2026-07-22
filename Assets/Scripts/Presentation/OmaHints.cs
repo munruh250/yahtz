@@ -21,7 +21,7 @@ namespace Yahtzee.Presentation
             "Tiny Bubbles Sunshine agrees, and she is never wrong about dice.",
             "Guter Teig braucht Zeit, Schatz. So do good dice.",
             "Ach du lieber, this is more nerve-wracking than my Streuselkuchen.",
-            "I once let an Apfelstrudel burn waiting for a Yahtzee. Worth it.",
+            "I once let an Apfelstrudel burn waiting for all five to match. Worth it.",
             "Tiny Bubbles Sunshine is asleep on my slipper. She believes in you.",
             "Patience, Liebling. Even the Hefeteig needs time to rise.",
             "My mother played it this way, and she never once apologised for it.",
