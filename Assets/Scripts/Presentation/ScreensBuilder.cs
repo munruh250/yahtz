@@ -206,20 +206,26 @@ namespace Yahtzee.Presentation
             for (int i = 0; i < difficulties.Length; i++)
             {
                 var choice = difficulties[i];
-                difficultyButtons[i] = Chip(card, choice.ToString(), i, difficulties.Length, 0.80f,
+                difficultyButtons[i] = Chip(card, choice.ToString(), i, difficulties.Length, 0.83f,
                     () => GameSettings.SelectedDifficulty = choice);
             }
 
-            SectionLabel(card, "Your dice", 0.62f);
+            SectionLabel(card, "Your dice", 0.69f);
             var diceButtons = new Image[DiceSkins.All.Length];
             for (int i = 0; i < DiceSkins.All.Length; i++)
             {
                 var skin = DiceSkins.All[i];
-                diceButtons[i] = Chip(card, skin.DisplayName, i, DiceSkins.All.Length, 0.52f,
+                diceButtons[i] = Chip(card, skin.DisplayName, i, DiceSkins.All.Length, 0.62f,
                     () => { if (GameSettings.Owns(skin.Id)) GameSettings.SelectedDice = skin.Id; });
             }
 
-            MenuButton(card, "Back", 3, UiPalette.ChromeLight, () => view.Show(ScreensView.Screen.Home));
+            SectionLabel(card, "Sound & feel", 0.50f);
+            var (soundBg, soundLabel) = ToggleChip(card, 0, 2, 0.43f, "Sound",
+                () => GameSettings.SoundEnabled = !GameSettings.SoundEnabled);
+            var (hapticsBg, hapticsLabel) = ToggleChip(card, 1, 2, 0.43f, "Haptics",
+                () => GameSettings.HapticsEnabled = !GameSettings.HapticsEnabled);
+
+            MenuButton(card, "Back", 4, UiPalette.ChromeLight, () => view.Show(ScreensView.Screen.Home));
 
             refreshers.Add(() =>
             {
@@ -232,8 +238,30 @@ namespace Yahtzee.Presentation
                     diceButtons[i].color = !GameSettings.Owns(skin.Id) ? UiPalette.PaperRule
                         : skin.Id == GameSettings.SelectedDice ? UiPalette.Accent : UiPalette.PaperShade;
                 }
+                soundLabel.text = GameSettings.SoundEnabled ? "Sound: On" : "Sound: Off";
+                soundBg.color = GameSettings.SoundEnabled ? UiPalette.Accent : UiPalette.PaperShade;
+                hapticsLabel.text = GameSettings.HapticsEnabled ? "Haptics: On" : "Haptics: Off";
+                hapticsBg.color = GameSettings.HapticsEnabled ? UiPalette.Accent : UiPalette.PaperShade;
             });
             return backdrop.gameObject;
+        }
+
+        /// <summary>A chip whose label and colour reflect an on/off setting, flipped on tap. The
+        /// caller's refresher sets the text and colour so it always matches the stored value.</summary>
+        private static (Image bg, TMPro.TextMeshProUGUI label) ToggleChip(RectTransform card, int index, int count,
+            float top, string name, UnityEngine.Events.UnityAction onClick)
+        {
+            float width = 0.90f / count;
+            float x0 = 0.05f + index * width;
+            var bg = UiBuilder.Image(card, name, new Vector2(x0 + 0.012f, top - 0.085f),
+                new Vector2(x0 + width - 0.012f, top), UiPalette.PaperShade, cornerRadius: 22);
+            var button = bg.gameObject.AddComponent<Button>();
+            button.targetGraphic = bg;
+            button.onClick.AddListener(onClick);
+            var label = UiBuilder.Text(bg.rectTransform, "Label", name, 28f, UiPalette.Ink,
+                TextAlignmentOptions.Center, Vector2.zero, Vector2.one);
+            label.fontStyle = FontStyles.Bold;
+            return (bg, label);
         }
 
         private static GameObject BuildStore(RectTransform parent, ScreensView view, GameController controller,

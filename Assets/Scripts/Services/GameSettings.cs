@@ -26,8 +26,25 @@ namespace Yahtzee.Services
         private const string DifficultyKey = "yz.difficulty";
         private const string DiceKey = "yz.dice";
         private const string OwnedPrefix = "yz.owns.";
+        private const string SoundKey = "yz.sound";
+        private const string HapticsKey = "yz.haptics";
 
         public static event Action Changed;
+
+        /// <summary>Global mute toggle (design §5.4) — SFX and the background loop. On by default.</summary>
+        public static bool SoundEnabled
+        {
+            get => PlayerPrefs.GetInt(SoundKey, 1) == 1;
+            set { PlayerPrefs.SetInt(SoundKey, value ? 1 : 0); PlayerPrefs.Save(); Changed?.Invoke(); }
+        }
+
+        /// <summary>Vibration on dice taps and a five-of-a-kind. On by default; respects the OS
+        /// setting too (a device with vibration off feels nothing regardless).</summary>
+        public static bool HapticsEnabled
+        {
+            get => PlayerPrefs.GetInt(HapticsKey, 1) == 1;
+            set { PlayerPrefs.SetInt(HapticsKey, value ? 1 : 0); PlayerPrefs.Save(); Changed?.Invoke(); }
+        }
 
         public static Difficulty SelectedDifficulty
         {
@@ -81,6 +98,8 @@ namespace Yahtzee.Services
             PlayerPrefs.DeleteKey(DifficultyKey);
             PlayerPrefs.DeleteKey(DiceKey);
             PlayerPrefs.DeleteKey(OwnedPrefix + RubyDice);
+            PlayerPrefs.DeleteKey(SoundKey);
+            PlayerPrefs.DeleteKey(HapticsKey);
             PlayerPrefs.Save();
             Changed?.Invoke();
         }

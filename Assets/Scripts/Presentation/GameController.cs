@@ -53,6 +53,7 @@ namespace Yahtzee.Presentation
         private SpeechBubbleView _speech;
         private readonly DialogueService _dialogue = new DialogueService();
         private ScreensView _screens;
+        private AudioService _audio;
         private DiceView3D _dice3d;   // null in 2D mode
         private OmaView _omaView;               // null in 2D mode or before assets import
 
@@ -66,6 +67,8 @@ namespace Yahtzee.Presentation
         {
             Application.targetFrameRate = 60;
             _oma = BuildOma();
+            _audio = gameObject.AddComponent<AudioService>();
+            _audio.Init();
             var refs = UiBuilder.Build(transform, this, Use3dDice);
             _hud = refs.Hud;
             _speech = refs.SpeechBubble;
@@ -127,6 +130,7 @@ namespace Yahtzee.Presentation
             _hud.CloseMenu();
             _speech.Hide(); // a hint about the previous game's dice would be nonsense
             RefreshAll();
+            _audio.StartMusic();
             Say(_dialogue.StartGame());
 
             // A loaded save may resume mid-Oma-turn.
@@ -153,6 +157,8 @@ namespace Yahtzee.Presentation
                 return;
             Engine.SetKeep(index, !Engine.State.Dice.Kept[index]);
             _dice.SetDice(Engine.State.Dice.Values, Engine.State.Dice.Kept);
+            HapticsService.Light();      // a small tick under the finger
+            _audio.Play(AudioService.Sfx.Keep);
         }
 
         public void OnCellTapped(Category category)
@@ -316,6 +322,7 @@ namespace Yahtzee.Presentation
             switch (gameEvent)
             {
                 case DiceRolled rolled:
+                    _audio.Play(AudioService.Sfx.DiceRoll);
                     _dice.PlayRoll(rolled.Values, Engine.State.Dice.Kept, OnDiceSettled);
                     break;
                 case JokerActivated joker:
@@ -324,10 +331,14 @@ namespace Yahtzee.Presentation
                 case ScoreCommitted committed:
                     if (committed.YahtzeeBonusAwarded)
                         _toast = "Five of a Kind bonus +100! ";
+                    _audio.Play(AudioService.Sfx.Score);
+                    PlayScoreFeedback(committed);
                     ReactToScore(committed);
                     break;
                 case UpperBonusSecured bonus:
                     _toast = $"{(bonus.Player == PlayerId.Player ? "Your" : "Oma's")} upper bonus +35! ";
+                    if (bonus.Player == PlayerId.Player)
+                        _audio.Play(AudioService.Sfx.FanfareBonus);
                     break;
                 case TurnChanged turn:
                     SaveService.Save(Engine.State);
@@ -339,6 +350,9 @@ namespace Yahtzee.Presentation
                 case GameEnded ended:
                     SaveService.Save(Engine.State);
                     RefreshAll();
+                    _audio.Play(ended.Result == GameResult.OmaWins
+                        ? AudioService.Sfx.LoseSting
+                        : AudioService.Sfx.WinSting); // player win or a tie both read as a good ending
                     _screens.ShowResults(Engine.State, ended.Result, line);
                     break;
             }
@@ -356,13 +370,30 @@ namespace Yahtzee.Presentation
         private void OnDiceSettled()
         {
             InputLocked = false;
-            // The card is a physical object on the table, so every framing the player can score
-            // from has to show all 13 boxes — DiceFocus crops it. Treat DiceFocus as the roll's
-            // push-in only and ease back once the dice rest: to the card when the rolls are
-            // spent (with best-option hints, computed in RefreshAll), otherwise to the framing
-            // that reads dice and card together.
-            if (!IsOmaTurn && Engine.State.Phase == GamePhase.Deciding)
             RefreshAll();
+        }
+
+        /// <summary>Fanfare + haptics for the PLAYER's special hands (design §5.4). Only the
+        /// player's — a stinger and a buzz when Oma scores would be the game cheering against you;
+        /// her hands get her own clap instead.</summary>
+        private void PlayScoreFeedback(ScoreCommitted committed)
+        {
+            if (committed.Player != PlayerId.Player)
+                return;
+
+            bool fiveOfAKind = committed.YahtzeeBonusAwarded
+                || (committed.Category == Category.Yahtzee && committed.Points == ScoreCalculator.YahtzeeScore);
+            if (fiveOfAKind)
+            {
+                _audio.Play(AudioService.Sfx.FanfareFiveKind);
+                HapticsService.Success();
+                return;
+            }
+
+            bool bigHand = (committed.Category == Category.LargeStraight || committed.Category == Category.FullHouse)
+                           && committed.Points > 0;
+            if (bigHand)
+                _audio.Play(AudioService.Sfx.FanfareStraight);
         }
 
         /// <summary>Oma reacts to YOUR scores. She claps for herself — that happens in
