@@ -292,12 +292,18 @@ namespace Yahtzee.Core
                     return Category.FourOfAKind;
             }
 
-            if (HasNoDuplicates(counts) && LongestRun(counts) >= 3)
+            int run = LongestRun(counts);
+            if (HasNoDuplicates(counts) && run >= 3)
             {
-                if (card.IsOpen(Category.LargeStraight))
+                // A three-in-a-row is realistically chasing the Small Straight — one more die —
+                // not the Large, which needs two. Only a four-run is genuinely reaching for Large.
+                // Report the honest goal so the hint doesn't always claim a large straight.
+                if (run >= 4 && card.IsOpen(Category.LargeStraight))
                     return Category.LargeStraight;
                 if (card.IsOpen(Category.SmallStraight))
                     return Category.SmallStraight;
+                if (card.IsOpen(Category.LargeStraight))
+                    return Category.LargeStraight;
             }
 
             return Category.Chance;
